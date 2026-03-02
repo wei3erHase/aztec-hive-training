@@ -1,0 +1,42 @@
+{
+  "buildCommand": "yarn build-app:ci",
+  "outputDirectory": "dist",
+  "framework": null,
+  "rewrites": [
+    {
+      "source": "/artifact-registry/:path*",
+      "destination": "https://devnet.aztec-registry.xyz/:path*"
+    },
+    {
+      "source": "/api/devnet",
+      "destination": "https://v4-devnet-2.aztec-labs.com"
+    },
+    {
+      "source": "/api/devnet/:path*",
+      "destination": "https://v4-devnet-2.aztec-labs.com/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Cross-Origin-Opener-Policy",
+          "value": "same-origin"
+        },
+        {
+          "key": "Cross-Origin-Embedder-Policy",
+          "value": "credentialless"
+        },
+        {
+          "key": "Cross-Origin-Resource-Policy",
+          "value": "cross-origin"
+        }
+      ]
+    }
+  ]
+}

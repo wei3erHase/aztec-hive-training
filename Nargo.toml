@@ -1,0 +1,7 @@
+[workspace]
+members = [
+  "contracts/zkml",
+  "contracts/single_layer_contract",
+  "contracts/multi_layer_perceptron",
+  "contracts/cnn_gap_contract",
+]

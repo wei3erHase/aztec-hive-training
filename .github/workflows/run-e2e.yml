@@ -1,0 +1,43 @@
+name: Run E2E Tests
+
+on:
+  workflow_call:
+    inputs:
+      runner:
+        description: "GitHub runner label"
+        type: string
+        default: "ubuntu-latest-m"
+      timeout:
+        description: "Job timeout in minutes"
+        type: number
+        default: 120
+
+jobs:
+  e2e:
+    name: E2E Tests
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: ${{ inputs.timeout }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Aztec environment
+        uses: defi-wonderland/aztec-ci-actions/actions/setup-aztec@v0
+        with:
+          start-pxe: "true"
+          run-compile: "true"
+          run-codegen: "true"
+
+      - name: Deploy contracts to local network
+        run: VITE_PROVER_ENABLED=false yarn deploy-contracts:local-network
+
+      - name: Build app
+        run: yarn build-app:ci
+
+      - name: Install Playwright browsers
+        run: yarn playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        run: yarn playwright test --project=chromium

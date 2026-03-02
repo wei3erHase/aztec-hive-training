@@ -1,0 +1,7 @@
+[package]
+name = "zkml"
+version = "0.1.0"
+type = "lib"
+authors = ["wei3erHase"]
+license = "MIT"
+compiler_version = ">=1.0.0"
