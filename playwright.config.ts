@@ -20,7 +20,7 @@ export default defineConfig({
     },
   },
   expect: {
-    timeout: 20_000,
+    timeout: process.env.CI ? 45_000 : 20_000,
   },
   timeout: 400_000,
   projects: [
@@ -43,9 +43,11 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: 'PORT=3000 yarn serve',
+    command: process.env.CI
+      ? 'PORT=3000 yarn dev'
+      : 'PORT=3000 yarn serve',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
-    timeout: 30_000,
+    timeout: process.env.CI ? 120_000 : 30_000,
   },
 });

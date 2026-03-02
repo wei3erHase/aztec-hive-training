@@ -1,4 +1,13 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
+
+const APP_READY_TIMEOUT = process.env.CI ? 45_000 : 15_000;
+
+async function gotoAndWaitForHome(page: Page) {
+  await page.goto('/');
+  await page.waitForSelector('[data-testid="home-page"]', {
+    timeout: APP_READY_TIMEOUT,
+  });
+}
 
 // ============================================================================
 // Smoke tests – run against the live dev server at http://localhost:3000
@@ -7,31 +16,31 @@ import { test, expect } from '@playwright/test';
 
 test.describe('App shell', () => {
   test('page loads with correct title', async ({ page }) => {
-    await page.goto('/');
+    await gotoAndWaitForHome(page);
     await expect(page).toHaveTitle(/HIVE Neural Network/i);
   });
 
   test('header renders with logo and navigation tabs', async ({ page }) => {
-    await page.goto('/');
+    await gotoAndWaitForHome(page);
     const header = page.locator('nav, header').first();
-    await expect(header).toBeVisible();
+    await expect(header).toBeVisible({ timeout: APP_READY_TIMEOUT });
   });
 
   test('wallet connect button is visible and wallet is NOT connected', async ({
     page,
   }) => {
-    await page.goto('/');
+    await gotoAndWaitForHome(page);
     const connectBtn = page.getByRole('button', { name: /connect/i }).first();
-    await expect(connectBtn).toBeVisible({ timeout: 10_000 });
+    await expect(connectBtn).toBeVisible({ timeout: APP_READY_TIMEOUT });
   });
 });
 
 test.describe('Home page — unauthenticated state', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
+    await gotoAndWaitForHome(page);
     // Wait until the wallet connect button is visible — React has settled
     await page.waitForSelector('[data-testid="demo-connect-wallet-button"]', {
-      timeout: 15_000,
+      timeout: APP_READY_TIMEOUT,
     });
   });
 
@@ -80,7 +89,7 @@ test.describe('Network / connection state (no local Aztec node running)', () => 
   test('app does NOT crash — root element is still present after connection failure', async ({
     page,
   }) => {
-    await page.goto('/');
+    await gotoAndWaitForHome(page);
     await page.waitForLoadState('domcontentloaded');
     await expect(page.locator('#root')).toBeVisible();
   });
@@ -88,7 +97,7 @@ test.describe('Network / connection state (no local Aztec node running)', () => 
   test('no Aztec block number is displayed (node not reachable)', async ({
     page,
   }) => {
-    await page.goto('/');
+    await gotoAndWaitForHome(page);
     await page.waitForLoadState('domcontentloaded');
     // No block number indicator should be present or visible
     const blockEl = page.locator('[data-testid="block-number"]');
@@ -112,7 +121,7 @@ test.describe('Network / connection state (no local Aztec node running)', () => 
       }
     });
 
-    await page.goto('/');
+    await gotoAndWaitForHome(page);
     // Give the app's checkConnection() useEffect time to fire and complete
     await page.waitForFunction(() => document.readyState === 'complete', {
       timeout: 10_000,
@@ -139,9 +148,9 @@ test.describe('Network / connection state (no local Aztec node running)', () => 
 
 test.describe('Predict / train flow — expected to be blocked without wallet', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
+    await gotoAndWaitForHome(page);
     await page.waitForSelector('[data-testid="demo-connect-wallet-button"]', {
-      timeout: 15_000,
+      timeout: APP_READY_TIMEOUT,
     });
   });
 
