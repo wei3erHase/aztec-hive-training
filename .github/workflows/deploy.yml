@@ -64,6 +64,6 @@ jobs:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
           scope: ${{ secrets.VERCEL_ORG_ID}}
-          vercel-args: ${{ github.event_name == 'pull_request' && '' || (github.ref_name == 'main' && '--prod' || '') }}
+          vercel-args: ${{ github.event_name == 'pull_request' && '--build-env GH_ACTIONS_DEPLOY=1' || (github.ref_name == 'main' && '--prod --build-env GH_ACTIONS_DEPLOY=1' || '--build-env GH_ACTIONS_DEPLOY=1') }}
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
           working-directory: ./

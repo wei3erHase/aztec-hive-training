@@ -1,4 +1,5 @@
 {
+  "ignoreCommand": "if [ \"$GH_ACTIONS_DEPLOY\" = \"1\" ]; then echo \"Proceeding with GitHub Actions deployment\"; exit 1; else echo \"Ignoring non-GitHub deployment\"; exit 0; fi",
   "buildCommand": "yarn build-app:ci",
   "outputDirectory": "dist",
   "framework": null,
