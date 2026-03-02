@@ -12,8 +12,12 @@ concurrency:
 jobs:
   tests:
     uses: defi-wonderland/aztec-ci-actions/.github/workflows/run-tests.yml@v0
+    with:
+      runner: ubuntu-latest
     secrets: inherit
 
   e2e:
     uses: ./.github/workflows/run-e2e.yml
+    with:
+      runner: ubuntu-latest
     secrets: inherit

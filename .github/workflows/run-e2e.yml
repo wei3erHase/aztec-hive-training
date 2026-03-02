@@ -6,7 +6,7 @@ on:
       runner:
         description: "GitHub runner label"
         type: string
-        default: "ubuntu-latest-m"
+        default: "ubuntu-latest"
       timeout:
         description: "Job timeout in minutes"
         type: number
