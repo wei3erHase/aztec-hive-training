@@ -47,7 +47,7 @@
     "@aztec/kv-store": "4.0.0-devnet.2-patch.1",
     "@aztec/noir-contracts.js": "4.0.0-devnet.2-patch.1",
     "@aztec/pxe": "4.0.0-devnet.2-patch.1",
-    "@aztec/stdlib": "4.0.0-devnet.2-patch.1",
+    "@aztec/stdlib": "4.0.4",
     "@aztec/wallet-sdk": "4.0.0-devnet.2-patch.1",
     "@radix-ui/react-dialog": "1.1.15",
     "@radix-ui/react-select": "2.2.6",
