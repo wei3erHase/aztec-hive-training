@@ -10,14 +10,20 @@ concurrency:
 jobs:
   checks:
     uses: defi-wonderland/aztec-ci-actions/.github/workflows/run-tests.yml@v0
+    with:
+      runner: ubuntu-latest
     secrets: inherit
 
   e2e:
     uses: ./.github/workflows/run-e2e.yml
+    with:
+      runner: ubuntu-latest
     secrets: inherit
 
   benchmark:
     uses: defi-wonderland/aztec-benchmark/.github/workflows/pr-benchmark.yml@4.0.0-devnet.2-patch.1
+    with:
+      runner: ubuntu-latest
     permissions:
       contents: read
       pull-requests: write
