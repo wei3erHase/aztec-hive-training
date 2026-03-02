@@ -37,6 +37,7 @@ src/target/
 src/artifacts/
 artifacts/
 codegenCache.json
+benchmarks/*.benchmark.json
 
 # Playwright
 test-results/

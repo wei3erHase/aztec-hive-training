@@ -5,3 +5,6 @@ members = [
   "contracts/multi_layer_perceptron",
   "contracts/cnn_gap_contract",
 ]
+
+[benchmark]
+training = "benchmarks/training.benchmark.ts"
