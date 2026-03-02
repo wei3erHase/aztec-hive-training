@@ -40,7 +40,7 @@
   "dependencies": {
     "@azguardwallet/client": "0.8.0",
     "@azguardwallet/types": "0.8.0",
-    "@aztec/accounts": "4.0.0-devnet.2-patch.1",
+    "@aztec/accounts": "4.0.4",
     "@aztec/aztec.js": "4.0.0-devnet.2-patch.1",
     "@aztec/constants": "4.0.0-devnet.2-patch.1",
     "@aztec/foundation": "4.0.0-devnet.2-patch.1",
