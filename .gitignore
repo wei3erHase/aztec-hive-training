@@ -48,3 +48,4 @@ playwright/.cache/
 
 .cursor/*
 .claude/*
+.vercel
