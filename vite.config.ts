@@ -1,9 +1,15 @@
-import fs from 'node:fs';
-import path from 'node:path';
 import react from '@vitejs/plugin-react';
 import { defineConfig, Plugin } from 'vite';
+import { nodePolyfills } from 'vite-plugin-node-polyfills';
+import topLevelAwait from 'vite-plugin-top-level-await';
+import wasm from 'vite-plugin-wasm';
+import fs from 'node:fs';
+import path from 'node:path';
 
-const DEPLOYED_LOCAL_PATH = path.resolve(process.cwd(), 'config/deployed.local.json');
+const DEPLOYED_LOCAL_PATH = path.resolve(
+  process.cwd(),
+  'config/deployed.local.json'
+);
 const VIRTUAL_ID = '\0virtual:deployed-local-config';
 
 /** Injects deployed.local.json via virtual module (avoids glob+gitignore issues). */
@@ -35,10 +41,6 @@ const injectDeployedLocal = (): Plugin => ({
     server.watcher.on('add', maybeReload);
   },
 });
-import { nodePolyfills } from 'vite-plugin-node-polyfills';
-import topLevelAwait from 'vite-plugin-top-level-await';
-import wasm from 'vite-plugin-wasm';
-
 /**
  * Plugin to fix static class field initialization issue with Rollup bundling.
  * When Rollup bundles classes, it transforms `class Foo {}` to `let Foo; Foo = class {}`
@@ -197,6 +199,11 @@ export default defineConfig(() => {
     },
     esbuild: {
       target: 'esnext',
+      // Avoid TDZ issues from minified class static field initializers in
+      // Aztec/Foundation classes (e.g. static ZERO = new Fr(...)).
+      supported: {
+        'class-static-field': false,
+      },
     },
     resolve: {
       alias: {
@@ -225,6 +232,12 @@ export default defineConfig(() => {
         'json-stringify-deterministic':
           'json-stringify-deterministic/lib/index.js',
       },
+      dedupe: [
+        '@aztec/foundation',
+        '@aztec/circuits.js',
+        '@noble/curves',
+        '@noble/hashes',
+      ],
     },
     server: {
       port: 3000,
@@ -272,6 +285,14 @@ export default defineConfig(() => {
           preserveModules: false,
           inlineDynamicImports: false,
           interop: 'auto',
+          manualChunks: (id: string) => {
+            if (id.includes('@noble/curves') || id.includes('@noble/hashes')) {
+              return 'vendor-noble';
+            }
+            if (id.includes('@aztec/foundation')) {
+              return 'vendor-aztec-foundation';
+            }
+          },
           assetFileNames: (assetInfo) => {
             if (assetInfo.names.some((name) => name.endsWith('.wasm'))) {
               return 'assets/[name]-[hash][extname]';
