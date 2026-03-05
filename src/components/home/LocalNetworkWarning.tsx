@@ -34,7 +34,7 @@ export const LocalNetworkWarning: React.FC = () => (
     <ol className={styles.steps}>
       <li>
         Start the local network:{' '}
-        <code className={styles.code}>aztec start --local-network</code>
+        <code className={styles.code}>gaztec start --local-network</code>
       </li>
       <li>
         Deploy with: <code className={styles.code}>yarn deploy-contracts</code>

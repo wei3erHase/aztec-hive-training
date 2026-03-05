@@ -14,15 +14,15 @@
  *      so each test starts in the connected state without the deployment wait.
  *
  * Prerequisites:
- *   - Local Aztec network running: `aztec start --local-network`
+ *   - Local Aztec network running: `gaztec start --local-network`
  *   - App dev/preview server running on port 3000 with deployed.local.json present
  */
 
 import { test as base, expect } from '@playwright/test';
-import type { Page } from '@playwright/test';
 import { execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
+import type { Page } from '@playwright/test';
 
 // ---- types mirrored from src/aztec-wallet/services/wallet/embeddedAccount.ts ----
 interface StoredAccountData {
@@ -88,7 +88,7 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
   // so the virtual:deployed-local-config module picks up deployed.local.json.
   // ------------------------------------------------------------------
   contractsDeployed: [
-    async ({}, use) => {
+    async (_, use) => {
       const deployed = ensureContractsDeployed();
       await use(deployed);
     },

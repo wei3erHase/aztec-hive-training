@@ -2,7 +2,7 @@
  * E2E tests for the connected application state (local network).
  *
  * These tests require:
- *   - A running local Aztec network: `aztec start --local-network`
+ *   - A running local Aztec network: `gaztec start --local-network`
  *   - Contracts deployed: `yarn deploy-contracts --network local-network`
  *   - App server running on port 3000: `yarn dev` or `yarn serve`
  *

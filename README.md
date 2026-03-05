@@ -31,23 +31,18 @@ yarn install
 ### Start Local Network & Deploy
 
 ```bash
-# Install the Aztec version manager
-bash -i <(curl -s https://install.aztec.network)
-
-# Install the matching Aztec version (see package.json config.aztecVersion)
-aztec-up install 4.0.0-devnet.2-patch.1
+# Confirm pinned Aztec version for this repo
+cat .aztecrc
 
 # Terminal 1: Start Anvil (local L1 chain)
 anvil --host 0.0.0.0 -p 8545 --block-time 12
 
 # Terminal 2: Start the Aztec local network
-aztec start --local-network --l1-rpc-urls http://localhost:8545
+gaztec start --local-network --l1-rpc-urls http://localhost:8545
 
 # Terminal 3: Build, deploy, and run
 yarn build && yarn deploy-contracts:local-network && yarn dev
 ```
-
-> **Note:** The `aztec-up install` step requires Foundry to not be running. If it fails with "anvil is currently running", stop Anvil first, install, then restart it.
 
 The application will be available at **http://localhost:3000**
 
@@ -59,7 +54,7 @@ The application will be available at **http://localhost:3000**
 
 ```bash
 yarn build-contracts          # Compile all Noir contracts + generate TS bindings
-yarn test:nr                  # Run Noir contract tests (aztec test)
+yarn test:nr                  # Run Noir contract tests (gaztec test)
 ```
 
 ### Deployment

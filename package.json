@@ -8,8 +8,8 @@
   },
   "scripts": {
     "clean": "rm -rf dist src/target src/artifacts/*.json src/artifacts/*.js src/artifacts/*.d.ts contracts/*/target target",
-    "build:contracts": "aztec compile && mkdir -p src/target && cp target/*.json src/target/",
-    "codegen": "aztec codegen src/target --outdir src/artifacts -f",
+    "build:contracts": "gaztec compile && mkdir -p src/target && cp target/*.json src/target/",
+    "codegen": "gaztec codegen src/target --outdir src/artifacts -f",
     "build:local": "yarn build-contracts && yarn build-app",
     "build": "yarn build-contracts && yarn build-app",
     "build-contracts": "tsx scripts/build-contracts.ts --force",
@@ -26,7 +26,7 @@
     "prep-test": "VITE_PROVER_ENABLED=false yarn deploy-contracts && yarn build-app",
     "test": "vitest run",
     "test:js": "vitest run",
-    "test:nr": "aztec test",
+    "test:nr": "gaztec test",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
@@ -101,6 +101,7 @@
     "eslint-plugin-react-hooks": "7.0.1",
     "eslint-plugin-react-refresh": "0.4.26",
     "eslint-plugin-unused-imports": "4.4.1",
+    "gaztec": "1.3.1",
     "globals": "17.0.0",
     "jsdom": "27.3.0",
     "prettier": "3.5.3",
@@ -121,9 +122,6 @@
     "tabWidth": 2,
     "singleQuote": true,
     "trailingComma": "es5"
-  },
-  "config": {
-    "aztecVersion": "4.0.0-devnet.2-patch.1"
   },
   "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e",
   "resolutions": {

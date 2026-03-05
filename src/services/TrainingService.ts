@@ -52,7 +52,7 @@ function formatConnectionError(
 
   if (isConnectionFailure) {
     if (isLocal) {
-      return 'Local network is not running. Start it with `yarn deploy-contracts` or `aztec start` before deploying.';
+      return 'Local network is not running. Start it with `yarn deploy-contracts` or `gaztec start --local-network` before deploying.';
     }
     return `Cannot connect to ${networkId}. Check your internet connection or try again later.`;
   }

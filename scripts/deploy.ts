@@ -9,7 +9,7 @@
  *   yarn deploy-contracts --network all            # deploy to both local-network and devnet
  *
  * Prerequisites:
- *   - Local network: run `aztec start --local-network` on port 8080
+ *   - Local network: run `gaztec start --local-network` on port 8080
  *   - Devnet: ensure network is reachable
  *   - Contracts must be built: yarn build-contracts
  */

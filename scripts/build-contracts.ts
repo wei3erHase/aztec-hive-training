@@ -27,6 +27,37 @@ function ensureDir(p: string): void {
   fs.mkdirSync(p, { recursive: true });
 }
 
+function getPinnedAztecVersion(projectRoot: string): string | null {
+  for (const rcFile of ['.aztecrc', '.gaztecrc']) {
+    const rcPath = path.join(projectRoot, rcFile);
+    if (fs.existsSync(rcPath)) {
+      const version = fs.readFileSync(rcPath, 'utf8').trim();
+      if (version) return version;
+    }
+  }
+  return null;
+}
+
+function resolveBbBinary(projectRoot: string): string {
+  const version = getPinnedAztecVersion(projectRoot);
+  const home = process.env.HOME;
+  if (version && home) {
+    const bbPath = path.join(
+      home,
+      '.aztec',
+      'versions',
+      version,
+      'node_modules',
+      '.bin',
+      'bb'
+    );
+    if (fs.existsSync(bbPath)) {
+      return bbPath;
+    }
+  }
+  return 'bb';
+}
+
 /**
  * Copy files with optional filter
  */
@@ -127,8 +158,7 @@ function compileLocalContracts(
   console.log('\n🔨 Compiling contracts from workspace...');
 
   // Compile all contracts from workspace root
-  // Note: In v4, nargo is installed directly via aztec-up.
-  tryRun(`cd "${projectRoot}" && nargo compile`);
+  tryRun(`cd "${projectRoot}" && gaztec nargo compile`);
   const compiledTarget = path.join(projectRoot, 'target');
   const hasArtifacts =
     fs.existsSync(compiledTarget) &&
@@ -143,14 +173,14 @@ function compileLocalContracts(
   // Postprocess: transpile public bytecode (ACIR → AVM) and generate VKs.
   // In v4, `aztec-nargo compile` only produces raw ACIR. `bb aztec_process`
   // transpiles public functions and sets `transpiled: true` in the JSON,
-  // which `aztec codegen` requires.
+  // which `gaztec codegen` requires.
   console.log('   🔧 Postprocessing contracts (transpile + VK generation)...');
   {
-    // Use local bb binary from aztec-up installation
+    const bbBinary = resolveBbBinary(projectRoot);
     const bbCmd = [
       `cd "${projectRoot}"`,
       `&& for f in target/*.json; do flags="$flags -i $f"; done;`,
-      `bb aztec_process $flags`,
+      `"${bbBinary}" aztec_process $flags`,
     ].join(' ');
     if (!tryRun(bbCmd)) {
       console.error('   ❌ Failed to postprocess contracts');
@@ -186,7 +216,7 @@ function compileLocalContracts(
   console.log('   🔧 Generating TypeScript artifacts...');
   if (
     !tryRun(
-      `cd "${projectRoot}" && aztec codegen src/target --outdir src/artifacts -f`
+      `cd "${projectRoot}" && gaztec codegen src/target --outdir src/artifacts -f`
     )
   ) {
     console.warn('   ⚠️ Codegen failed - TS artifacts may be stale');
