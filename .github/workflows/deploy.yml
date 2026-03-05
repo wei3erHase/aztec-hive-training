@@ -47,11 +47,11 @@ jobs:
       - name: Install Yarn dependencies
         run: yarn install --frozen-lockfile
 
-      - name: Setup Aztec environment
-        uses: defi-wonderland/aztec-ci-actions/actions/setup-aztec@v0
-        with:
-          start-pxe: "false"
-          run-codegen: "true"
+      - name: Setup gaztec
+        uses: nemi-fi/gaztec@v1.3.1
+
+      - name: Build contract artifacts
+        run: yarn build-contracts
 
       - name: Build frontend
         run: yarn build-app:ci

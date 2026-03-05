@@ -23,12 +23,36 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup Aztec environment
-        uses: defi-wonderland/aztec-ci-actions/actions/setup-aztec@v0
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          start-pxe: "true"
-          run-compile: "true"
-          run-codegen: "true"
+          node-version: '22'
+
+      - name: Install Yarn dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Setup gaztec
+        uses: nemi-fi/gaztec@v1.3.1
+
+      - name: Build contract artifacts
+        run: yarn build-contracts
+
+      - name: Start Aztec local network
+        run: |
+          nohup npx gaztec start --local-network > /tmp/gaztec.log 2>&1 &
+
+      - name: Wait for Aztec node
+        run: |
+          for i in {1..90}; do
+            if curl -fsS http://localhost:8080/status >/dev/null || curl -fsS http://localhost:8080 >/dev/null; then
+              echo "Aztec node is ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Aztec node did not become ready in time"
+          tail -n 200 /tmp/gaztec.log || true
+          exit 1
 
       - name: Deploy contracts to local network
         run: VITE_PROVER_ENABLED=false yarn deploy-contracts:local-network
