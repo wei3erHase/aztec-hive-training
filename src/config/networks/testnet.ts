@@ -3,9 +3,6 @@ import { NetworkConfig } from './types';
 
 /**
  * Testnet configuration for public Aztec testnet.
- *
- * Contract addresses are hardcoded for the public testnet.
- * These contracts are already deployed and available for testing.
  */
 export const TESTNET_CONFIG: NetworkConfig = {
   name: 'testnet',
@@ -16,13 +13,7 @@ export const TESTNET_CONFIG: NetworkConfig = {
       ? `${location.origin}/api/testnet`
       : 'https://rpc.testnet.aztec-labs.com/',
   publicNodeUrl: 'https://rpc.testnet.aztec-labs.com/',
-  dripperContractAddress:
-    '0x0000000000000000000000000000000000000000000000000000000000000000',
-  tokenContractAddress:
-    '0x0000000000000000000000000000000000000000000000000000000000000000',
   deployerAddress: AztecAddress.ZERO.toString(),
-  dripperDeploymentSalt: '1337',
-  tokenDeploymentSalt: '1337',
   proverEnabled: true,
   isTestnet: true,
   sponsoredFpcAddress:

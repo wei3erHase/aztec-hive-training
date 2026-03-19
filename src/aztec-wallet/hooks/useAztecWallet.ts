@@ -241,10 +241,9 @@ export function useAztecWallet() {
             break;
 
           case WalletType.WALLET_SDK:
-            // Wallet SDK connections are driven by the modal UI (discovery + verification)
-            // This path is not normally reached via this hook
-            await walletActions.connect(connectorId);
-            break;
+            // Connection is UI-driven (WalletSDKDiscoveryView → WalletSDKVerificationView).
+            // Calling connect() on WalletSDKConnector would throw; return cleanly.
+            return;
 
           default:
             await walletActions.connect(connectorId);

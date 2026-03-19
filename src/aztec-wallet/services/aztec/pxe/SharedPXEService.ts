@@ -1,11 +1,9 @@
-import { EcdsaRAccountContract } from '@aztec/accounts/ecdsa/lazy';
 import { AztecAddress } from '@aztec/aztec.js/addresses';
 import { getContractInstanceFromInstantiationParams } from '@aztec/aztec.js/contracts';
 import { SponsoredFeePaymentMethod } from '@aztec/aztec.js/fee';
 import { Fr } from '@aztec/aztec.js/fields';
 import { createLogger } from '@aztec/aztec.js/log';
 import type { AztecNode } from '@aztec/aztec.js/node';
-import { AccountManager } from '@aztec/aztec.js/wallet';
 import { SPONSORED_FPC_SALT } from '@aztec/constants';
 import { createStore } from '@aztec/kv-store/indexeddb';
 import { SponsoredFPCContractArtifact } from '@aztec/noir-contracts.js/SponsoredFPC';
@@ -17,7 +15,6 @@ import { AVAILABLE_NETWORKS } from '../../../../config/networks';
 import { FeePaymentRegister } from '../../../../services/aztec/feePayment/FeePaymentRegister';
 import { ZKMLContractRegister } from '../../../../services/aztec/zkml/ZKMLContractRegister';
 import { MinimalWallet } from '../../../../utils/MinimalWallet';
-import { getSavedAccount } from '../../../services/wallet/embeddedAccount';
 import { NetworkService } from '../network';
 import { AztecStorageService } from '../storage';
 import type { AztecNetwork } from '../../../../config/networks/constants';
@@ -447,98 +444,6 @@ class SharedPXEServiceClass {
     } catch (err) {
       logger.warn('Failed to pre-register ZKML contracts:', err);
     }
-  }
-
-  /**
-   * Pre-registers the saved embedded account (from localStorage) with the PXE
-   * during PXE initialisation, before the auto-connect flow fires.
-   *
-   * The block stream starts as soon as the PXE is created. The signing-key note
-   * for the embedded account is emitted at block N (the account-deployment block).
-   * If the auto-connect flow calls wallet.registerContract() while the block
-   * stream is trying to write the anchor-block header (also an IDB write), the
-   * browser's IDB "transaction not active" rule kills the block-stream write,
-   * leaving the anchor stuck at genesis. That prevents fetchTaggedLogs from
-   * ever finding the signing-key note, causing private transactions (training)
-   * to fail with "Failed to get a note 'self.is_some()'".
-   *
-   * By registering here — in the same init batch as ZKML pre-registration — we
-   * ensure the IDB write completes during the very first blocks of the sync
-   * (blocks 0 … N-1), so by the time the stream reaches block N there is
-   * nothing else contending for IDB write access.
-   */
-  private async preRegisterSavedAccount(wallet: MinimalWallet): Promise<void> {
-    if (typeof window === 'undefined') return; // localStorage not available in Node.js
-
-    // Wrap in a timeout so a hang in WASM/crypto initialisation never blocks
-    // initializeInstance (which would make ALL subsequent predict() calls hang).
-    const TIMEOUT_MS = 20_000;
-    const timeout = new Promise<void>((resolve) =>
-      setTimeout(() => {
-        logger.warn(
-          'preRegisterSavedAccount: timed out after 20s; auto-connect will register the account'
-        );
-        resolve();
-      }, TIMEOUT_MS)
-    );
-
-    const work = async () => {
-      try {
-        const saved = getSavedAccount();
-        // Guard against null or malformed credentials (e.g. empty object `{}`
-        // stored when a previous account-creation attempt was interrupted).
-        if (
-          !saved ||
-          !saved.secretKey ||
-          !saved.signingKey ||
-          !saved.salt ||
-          !saved.address
-        ) {
-          return;
-        }
-
-        // Skip if already in the wallet (e.g. called again after hot-reload)
-        const existingAccounts = await wallet.getAccounts();
-        if (
-          existingAccounts.some((a) => {
-            const addr = (a.item as { toString: () => string }).toString();
-            return addr === saved.address;
-          })
-        ) {
-          return;
-        }
-
-        const secretKey = Fr.fromString(saved.secretKey);
-        const salt = Fr.fromString(saved.salt);
-        const signingKey = Buffer.from(saved.signingKey, 'hex');
-        const accountContract = new EcdsaRAccountContract(signingKey);
-        const accountManager = await AccountManager.create(
-          wallet,
-          secretKey,
-          accountContract,
-          salt
-        );
-        const account = await accountManager.getAccount();
-        const instance = accountManager.getInstance();
-        const artifact = await accountManager
-          .getAccountContract()
-          .getContractArtifact();
-        await wallet.registerContract(
-          instance,
-          artifact,
-          accountManager.getSecretKey()
-        );
-        wallet.addAccount(account);
-        logger.info(
-          `Pre-registered saved account at ${accountManager.address.toString()}`
-        );
-      } catch (err) {
-        // Non-fatal: the auto-connect flow will register the account anyway
-        logger.warn('Failed to pre-register saved account:', err);
-      }
-    };
-
-    await Promise.race([work(), timeout]);
   }
 
   private async registerSavedSenders(
