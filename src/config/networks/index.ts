@@ -1,13 +1,13 @@
 export * from './types';
 export * from './constants';
 export * from './local-network';
-export * from './devnet';
+export * from './testnet';
 
-import { DEVNET_CONFIG } from './devnet';
 import { LOCAL_NETWORK_CONFIG } from './local-network';
+import { TESTNET_CONFIG } from './testnet';
 import { NetworkConfig } from './types';
 
 export const AVAILABLE_NETWORKS: NetworkConfig[] = [
-  DEVNET_CONFIG,
+  TESTNET_CONFIG,
   LOCAL_NETWORK_CONFIG,
 ];

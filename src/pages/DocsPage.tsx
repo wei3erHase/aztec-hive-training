@@ -274,7 +274,7 @@ export function DocsPage() {
             </li>
             <li>
               <span className={styles.aztecHighlight}>6M L2 gas per tx</span> —
-              Shapley for CNN uses most of this on devnet. MLP Explain fits
+              Shapley for CNN uses most of this on testnet. MLP Explain fits
               comfortably; Predict and Train work with all architectures.
             </li>
           </ul>

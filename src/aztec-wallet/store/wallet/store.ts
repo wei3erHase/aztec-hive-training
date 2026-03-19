@@ -1,7 +1,17 @@
 import { create } from 'zustand';
+import type { AccountWithSecretKey } from '@aztec/aztec.js/account';
+import { AztecAddress } from '@aztec/aztec.js/addresses';
+import type {
+  AppCapabilities,
+  GrantedAccountsCapability,
+  Wallet,
+} from '@aztec/aztec.js/wallet';
+import type { WalletProvider } from '@aztec/wallet-sdk/manager';
+import { getDeploymentConfig } from '../../../config/contracts';
+import { WALLET_SDK_CONNECTOR_ID } from '../../connectors/WalletSDKConnector';
 import { NetworkService } from '../../services/aztec/network';
+import { WalletType } from '../../types/aztec';
 import { getNetworkStore } from '../network';
-import { createBrowserActions } from './actions/browser';
 import { createEmbeddedActions } from './actions/embedded';
 import { isValidPXETransition } from './types';
 import type { WalletStore, WalletState } from './types';
@@ -9,11 +19,72 @@ import type {
   WalletConnector,
   WalletConnectorId,
 } from '../../../types/walletConnector';
-import type { WalletType } from '../../types/aztec';
 
 export type { WalletStore, PXEStatus, NetworkStatus } from './types';
 
 const WALLET_CONNECTION_STORAGE_KEY = 'aztec-wallet-connection';
+
+/**
+ * Builds a capability manifest scoped to the contracts deployed on the given
+ * network. Simulation and transaction scopes are declared upfront so the wallet
+ * only shows one permission dialog instead of per-operation popups.
+ */
+function buildCapabilityManifest(networkId: string): AppCapabilities {
+  const deploymentConfig = getDeploymentConfig(networkId);
+  const { singleLayer, multiLayerPerceptron, cnnGap } =
+    deploymentConfig.contracts;
+
+  const contractAddresses = [
+    singleLayer.address,
+    multiLayerPerceptron.address,
+    cnnGap.address,
+  ]
+    .filter((addr): addr is string => !!addr)
+    .map((addr) => AztecAddress.fromString(addr));
+
+  const capabilities: AppCapabilities['capabilities'] = [
+    { type: 'accounts', canGet: true },
+  ];
+
+  if (contractAddresses.length > 0) {
+    capabilities.push({
+      type: 'contracts',
+      contracts: contractAddresses,
+      canRegister: true,
+    });
+
+    // Unconstrained (utility) reads — auto-approved after initial grant
+    capabilities.push({
+      type: 'simulation',
+      utilities: {
+        scope: contractAddresses.flatMap((addr) => [
+          { contract: addr, function: 'get_all_packed_weights' },
+          { contract: addr, function: 'get_packed_biases' },
+        ]),
+      },
+    });
+
+    // Transaction submissions — wallet will still prompt per-tx, but
+    // declaring scope lets it show a meaningful name instead of raw calldata
+    capabilities.push({
+      type: 'transaction',
+      scope: contractAddresses.flatMap((addr) => [
+        { contract: addr, function: 'submit_training_input' },
+      ]),
+    });
+  }
+
+  return {
+    version: '1.0' as const,
+    metadata: {
+      name: 'Hive Neural Network',
+      version: '1.0.0',
+      description: 'Train neural networks on Aztec',
+      url: typeof window !== 'undefined' ? window.location.origin : '',
+    },
+    capabilities,
+  };
+}
 
 interface StoredWalletConnection {
   connectorId: WalletConnectorId;
@@ -28,7 +99,7 @@ const saveWalletConnection = (data: StoredWalletConnection): void => {
   }
 };
 
-const clearWalletConnection = (): void => {
+export const clearWalletConnection = (): void => {
   try {
     localStorage.removeItem(WALLET_CONNECTION_STORAGE_KEY);
   } catch {
@@ -56,10 +127,7 @@ const INITIAL_STATE: WalletState = {
   pxeError: null,
   signerType: null,
   connectedRdns: null,
-  caipAccount: null,
-  caipAccounts: [],
-  supportedChains: [],
-  isInstalled: false,
+  sdkWallet: null,
   connectors: [],
   activeConnectorId: null,
   connectingConnectorId: null,
@@ -136,10 +204,7 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
         error: null,
         signerType: null,
         connectedRdns: null,
-        caipAccount: null,
-        caipAccounts: [],
-        supportedChains: [],
-        isInstalled: false,
+        sdkWallet: null,
         activeConnectorId: null,
         connectingConnectorId: null,
         pxeStatus: 'idle',
@@ -174,8 +239,84 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
   // Embedded actions
   ...createEmbeddedActions(set, get),
 
-  // Browser Wallet actions
-  ...createBrowserActions(set, get),
+  // Wallet SDK actions
+  connectWalletSDK: async (
+    wallet: Wallet,
+    provider: WalletProvider,
+    connectorId: WalletConnectorId = WALLET_SDK_CONNECTOR_ID
+  ): Promise<AccountWithSecretKey> => {
+    const connectWith = get()._connectWith;
+    return connectWith(connectorId, async () => {
+      set({ status: 'connecting', error: null });
+
+      const { currentConfig } = getNetworkStore();
+      const networkId = currentConfig.name;
+      const manifest = buildCapabilityManifest(networkId);
+
+      // Primary flow: requestCapabilities() shows the unified permission dialog
+      // and returns granted accounts — use that instead of calling getAccounts() directly
+      // (which triggers a separate broken dialog on multi-account wallets).
+      let accounts: { item: AztecAddress; alias?: string }[] = [];
+      try {
+        const capabilities = await wallet.requestCapabilities(manifest);
+        const accountsCap = capabilities.granted.find(
+          (c): c is GrantedAccountsCapability => c.type === 'accounts'
+        );
+        accounts = accountsCap?.accounts ?? [];
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.includes('Network no longer exists')) {
+          throw new Error(
+            'The Aztec testnet is not configured in your wallet. ' +
+              'Please open Azguard, go to Networks, and add the testnet ' +
+              'using https://rpc.testnet.aztec-labs.com/ as the RPC URL.'
+          );
+        }
+        // Other errors: fall through to getAccounts() fallback below
+        console.warn('[connectWalletSDK] requestCapabilities failed:', msg);
+      }
+
+      // Fallback for wallets that don't support capabilities
+      if (accounts.length === 0) {
+        const raw = await wallet.getAccounts();
+        accounts = raw.map((a) => {
+          // Aliased<AztecAddress> can have .item or .address
+          const inner =
+            (a as unknown as { item?: AztecAddress; address?: AztecAddress })
+              .item ??
+            (a as unknown as { address?: AztecAddress }).address ??
+            (a as unknown as AztecAddress);
+          return { item: inner };
+        });
+      }
+
+      const primary = accounts[0];
+      if (!primary) {
+        throw new Error('Wallet returned no accounts');
+      }
+
+      const address = primary.item;
+      const fakeAccount = {
+        getAddress: () => address,
+      } as unknown as AccountWithSecretKey;
+
+      // Store the SDK wallet for later use (e.g., sending transactions)
+      const connector = get().connectors.find((c) => c.id === connectorId);
+      if (connector && 'setupWallet' in connector) {
+        (
+          connector as import('../../connectors/WalletSDKConnector').WalletSDKConnector
+        ).setupWallet(provider, wallet);
+      }
+
+      set({
+        account: fakeAccount,
+        sdkWallet: wallet,
+        walletType: WalletType.WALLET_SDK,
+      });
+
+      return fakeAccount;
+    });
+  },
 
   // Shared actions
   disconnect: async (cleanup?: () => Promise<void> | void) => {
@@ -228,13 +369,16 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
     const stored = getStoredWalletConnection();
 
     if (stored && !activeConnectorId) {
-      // Another tab connected - try to reconnect if embedded wallet
       if (stored.walletType === 'embedded') {
         try {
           await connectExistingEmbedded(stored.connectorId);
         } catch {
           // Silent fail - user can manually reconnect
         }
+      } else {
+        // SDK wallets (and any future types) cannot be auto-reconnected.
+        // Clear the stale entry so the user starts from a clean disconnected state.
+        clearWalletConnection();
       }
     } else if (!stored && activeConnectorId) {
       // Another tab disconnected - clear our state

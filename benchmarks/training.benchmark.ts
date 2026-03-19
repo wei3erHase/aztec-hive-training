@@ -93,91 +93,67 @@ export default class TrainingBenchmark extends Benchmark {
     const mkSalt = () =>
       new Fr(BigInt('0x' + randomBytes(32).toString('hex')) % FIELD_MODULUS);
 
-    // Deploy SingleLayer
-    const singlePackedWeights = packToFields(getSingleLayerWeights(), 23, 28);
-    const singlePackedBiases = packToFields(getSingleLayerBiases(), 1, 10);
-    const singleDeployed = await SingleLayerContract.deployWithOpts(
-      { wallet, method: 'constructor_pretrained' },
-      singlePackedWeights,
-      singlePackedBiases
-    ).send({
+    const deployOpts = (salt: Fr) => ({
       from: AztecAddress.ZERO,
       fee: { paymentMethod: feePaymentMethod },
       universalDeploy: true,
       skipInitialization: false,
-      contractAddressSalt: mkSalt(),
+      contractAddressSalt: salt,
     });
-    const singleContract = SingleLayerContract.at(
-      singleDeployed.address,
-      wallet
-    );
-    const singlePackedWeightsLive = (await singleContract.methods
+
+    // Deploy SingleLayer
+    const singlePackedWeights = packToFields(getSingleLayerWeights(), 23, 28);
+    const singlePackedBiases = packToFields(getSingleLayerBiases(), 1, 10);
+    const { contract: singleContract } = await SingleLayerContract.deployWithOpts(
+      { wallet, method: 'constructor_pretrained' },
+      singlePackedWeights,
+      singlePackedBiases
+    ).send(deployOpts(mkSalt()));
+    console.log(`SingleLayer deployed at: ${singleContract.address.toString()}`);
+
+    const { result: singleWeightsRaw } = await singleContract.methods
       .get_all_packed_weights()
-      .simulate({ from: deployer })) as Fr[];
-    const singlePackedBiasesLive = await singleContract.methods
+      .simulate({ from: deployer });
+    const { result: singleBiasesRaw } = await singleContract.methods
       .get_packed_biases()
       .simulate({ from: deployer });
-    const singleBiasesArr = Array.isArray(singlePackedBiasesLive)
-      ? (singlePackedBiasesLive as Fr[])
-      : [singlePackedBiasesLive as Fr];
-
-    console.log(
-      `SingleLayer deployed at: ${singleDeployed.address.toString()}`
-    );
 
     // Deploy MLP
     const mlpPackedWeights = packToFields(getMLPWeights(), 43, 28);
     const mlpPackedBiases = packToFields(getMLPBiases(), 1, 26);
-    const mlpDeployed = await MultiLayerPerceptronContract.deployWithOpts(
+    const { contract: mlpContract } = await MultiLayerPerceptronContract.deployWithOpts(
       { wallet, method: 'constructor_pretrained' },
       mlpPackedWeights,
       mlpPackedBiases
-    ).send({
-      from: AztecAddress.ZERO,
-      fee: { paymentMethod: feePaymentMethod },
-      universalDeploy: true,
-      skipInitialization: false,
-      contractAddressSalt: mkSalt(),
-    });
-    const mlpContract = MultiLayerPerceptronContract.at(
-      mlpDeployed.address,
-      wallet
-    );
-    const mlpPackedWeightsLive = (await mlpContract.methods
+    ).send(deployOpts(mkSalt()));
+    console.log(`MLP deployed at: ${mlpContract.address.toString()}`);
+
+    const { result: mlpWeightsRaw } = await mlpContract.methods
       .get_all_packed_weights()
-      .simulate({ from: deployer })) as Fr[];
-    const mlpPackedBiasesLive = await mlpContract.methods
+      .simulate({ from: deployer });
+    const { result: mlpBiasesRaw } = await mlpContract.methods
       .get_packed_biases()
       .simulate({ from: deployer });
-    const mlpBiasesArr = Array.isArray(mlpPackedBiasesLive)
-      ? (mlpPackedBiasesLive as Fr[])
-      : [mlpPackedBiasesLive as Fr];
-
-    console.log(`MLP deployed at: ${mlpDeployed.address.toString()}`);
 
     // Deploy CNNGAP
     const cnnPackedWeights = packToFields(getCNNWeights(), 3, 28);
     const cnnPackedBiases = packToFields(getCNNBiases(), 1, 28);
-    const cnnDeployed = await CNNGAPContract.deployWithOpts(
+    const { contract: cnnContract } = await CNNGAPContract.deployWithOpts(
       { wallet, method: 'constructor_pretrained' },
       cnnPackedWeights,
       cnnPackedBiases
-    ).send({
-      from: AztecAddress.ZERO,
-      fee: { paymentMethod: feePaymentMethod },
-      universalDeploy: true,
-      skipInitialization: false,
-      contractAddressSalt: mkSalt(),
-    });
-    const cnnContract = CNNGAPContract.at(cnnDeployed.address, wallet);
-    const cnnPackedWeightsLive = (await cnnContract.methods
-      .get_all_packed_weights()
-      .simulate({ from: deployer })) as Fr[];
-    const cnnPackedBiasesLive = (await cnnContract.methods
-      .get_packed_biases()
-      .simulate({ from: deployer })) as Fr[];
+    ).send(deployOpts(mkSalt()));
+    console.log(`CNNGAP deployed at: ${cnnContract.address.toString()}`);
 
-    console.log(`CNNGAP deployed at: ${cnnDeployed.address.toString()}`);
+    const { result: cnnWeightsRaw } = await cnnContract.methods
+      .get_all_packed_weights()
+      .simulate({ from: deployer });
+    const { result: cnnBiasesRaw } = await cnnContract.methods
+      .get_packed_biases()
+      .simulate({ from: deployer });
+
+    const toFrArr = (raw: unknown): Fr[] =>
+      Array.isArray(raw) ? (raw as Fr[]) : [raw as Fr];
 
     return {
       wallet,
@@ -185,18 +161,18 @@ export default class TrainingBenchmark extends Benchmark {
       accounts,
       singleLayer: {
         contract: singleContract,
-        packedWeights: singlePackedWeightsLive,
-        packedBiases: singleBiasesArr,
+        packedWeights: toFrArr(singleWeightsRaw),
+        packedBiases: toFrArr(singleBiasesRaw),
       },
       mlp: {
         contract: mlpContract,
-        packedWeights: mlpPackedWeightsLive,
-        packedBiases: mlpBiasesArr,
+        packedWeights: toFrArr(mlpWeightsRaw),
+        packedBiases: toFrArr(mlpBiasesRaw),
       },
       cnnGap: {
         contract: cnnContract,
-        packedWeights: cnnPackedWeightsLive,
-        packedBiases: cnnPackedBiasesLive,
+        packedWeights: toFrArr(cnnWeightsRaw),
+        packedBiases: toFrArr(cnnBiasesRaw),
       },
       feePaymentMethod,
     };

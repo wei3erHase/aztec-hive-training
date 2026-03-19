@@ -149,19 +149,32 @@ export default defineConfig(() => {
       changeOrigin: true,
       rewrite: () => '/status',
     },
-    '/api/devnet-status': {
-      target: 'https://v4-devnet-2.aztec-labs.com',
+    '/api/testnet-status': {
+      target: 'https://rpc.testnet.aztec-labs.com',
       changeOrigin: true,
       rewrite: () => '/status',
     },
-    '/api/devnet': {
-      target: 'https://v4-devnet-2.aztec-labs.com',
+    '/api/testnet': {
+      target: 'https://rpc.testnet.aztec-labs.com',
       changeOrigin: true,
-      rewrite: (path: string) => path.replace(/^\/api\/devnet/, '') || '/',
+      rewrite: (path: string) => path.replace(/^\/api\/testnet/, '') || '/',
     },
   };
 
   return {
+    // Suppress Rollup warnings that originate from node_modules and are not actionable.
+    // @aztec/noir-protocol-circuits-types imports the same JSON artifact files both with
+    // and without `{ type: 'json' }` assertions — nothing we can do without patching upstream.
+    onLog(level, log, handler) {
+      if (
+        level === 'warn' &&
+        log.message.includes('"type": "json" attributes') &&
+        log.message.includes('node_modules')
+      ) {
+        return;
+      }
+      handler(level, log);
+    },
     plugins: [
       nodeBuiltinsShim(), // Must be first to intercept before nodePolyfills
       injectDeployedLocal(),
@@ -263,7 +276,9 @@ export default defineConfig(() => {
     build: {
       sourcemap: false, // Disable sourcemaps to reduce memory usage
       minify: 'esbuild',
-      chunkSizeWarningLimit: 2000, // Increase chunk size warning limit
+      // Barretenberg WASM wrappers and ML artifact chunks are inherently large;
+      // raise the limit so that only genuinely unexpected large chunks surface.
+      chunkSizeWarningLimit: 50_000,
       target: 'esnext',
       commonjsOptions: {
         // Forces @aztec packages to be treated as ESM to prevent class identity errors

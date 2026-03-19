@@ -38,50 +38,47 @@ test.describe('App shell', () => {
 test.describe('Home page — unauthenticated state', () => {
   test.beforeEach(async ({ page }) => {
     await gotoAndWaitForHome(page);
-    // Wait until the wallet connect button is visible — React has settled
-    await page.waitForSelector('[data-testid="demo-connect-wallet-button"]', {
+  });
+
+  test('hero section shows a "Connect Wallet" button when no wallet is connected', async ({
+    page,
+  }) => {
+    const btn = page.locator('[data-testid="hero-connect-button"]');
+    await expect(btn).toBeVisible({ timeout: APP_READY_TIMEOUT });
+  });
+
+  test('training controls show "Connect Wallet to Train" instead of the submit button', async ({
+    page,
+  }) => {
+    const connectBtn = page.locator('[data-testid="train-connect-button"]');
+    await expect(connectBtn).toBeVisible({ timeout: APP_READY_TIMEOUT });
+    const submitBtn = page.locator('[data-testid="train-submit-button"]');
+    await expect(submitBtn).not.toBeVisible();
+  });
+
+  test('drawing canvas IS rendered — read-only predictions work without wallet', async ({
+    page,
+  }) => {
+    await expect(page.locator('[data-testid="canvas-panel"]')).toBeVisible({
+      timeout: APP_READY_TIMEOUT,
+    });
+    await expect(page.locator('canvas').first()).toBeVisible({
       timeout: APP_READY_TIMEOUT,
     });
   });
 
-  test('shows "Connect Wallet to Start" prompt when no wallet is connected', async ({
+  test('architecture selector buttons ARE rendered without wallet connection', async ({
     page,
   }) => {
-    await expect(page.getByText('Connect Wallet to Start')).toBeVisible({
-      timeout: 10_000,
-    });
-  });
-
-  test('the connect-wallet CTA button is present (data-testid)', async ({
-    page,
-  }) => {
-    const btn = page.locator('[data-testid="demo-connect-wallet-button"]');
-    await expect(btn).toBeVisible({ timeout: 10_000 });
-  });
-
-  test('drawing canvas is NOT rendered without wallet connection', async ({
-    page,
-  }) => {
-    // The canvas-panel and <canvas> are inside the isConnected branch
-    await expect(
-      page.locator('[data-testid="canvas-panel"]')
-    ).not.toBeVisible();
-    await expect(page.locator('canvas')).not.toBeVisible();
-  });
-
-  test('architecture selector buttons are NOT rendered without wallet connection', async ({
-    page,
-  }) => {
-    // Buttons use data-testid="architecture-{id}" — labels: "Simple Linear", "Multi-Layer Network", "CNN + GAP"
     await expect(
       page.locator('[data-testid="architecture-singleLayer"]')
-    ).not.toBeVisible();
-    await expect(
-      page.locator('[data-testid="architecture-mlp"]')
-    ).not.toBeVisible();
+    ).toBeVisible({ timeout: APP_READY_TIMEOUT });
+    await expect(page.locator('[data-testid="architecture-mlp"]')).toBeVisible({
+      timeout: APP_READY_TIMEOUT,
+    });
     await expect(
       page.locator('[data-testid="architecture-cnnGap"]')
-    ).not.toBeVisible();
+    ).toBeVisible({ timeout: APP_READY_TIMEOUT });
   });
 });
 
@@ -146,34 +143,26 @@ test.describe('Network / connection state (no local Aztec node running)', () => 
   });
 });
 
-test.describe('Predict / train flow — expected to be blocked without wallet', () => {
+test.describe('Predict / train flow — wallet gate applies only to on-chain actions', () => {
   test.beforeEach(async ({ page }) => {
     await gotoAndWaitForHome(page);
-    await page.waitForSelector('[data-testid="demo-connect-wallet-button"]', {
-      timeout: APP_READY_TIMEOUT,
-    });
   });
 
-  test('on-chain train button is disabled or absent without wallet connection', async ({
+  test('on-chain train submit button is absent — replaced by "Connect Wallet to Train"', async ({
     page,
   }) => {
-    const trainBtn = page
-      .getByRole('button', { name: /^train|submit training/i })
-      .first();
-    const isVisible = await trainBtn.isVisible().catch(() => false);
-
-    if (isVisible) {
-      // If somehow visible, it must be disabled
-      await expect(trainBtn).toBeDisabled();
-    }
-    // Not visible at all is the expected outcome — wallet gate hides it
+    await expect(
+      page.locator('[data-testid="train-submit-button"]')
+    ).not.toBeVisible();
+    await expect(
+      page.locator('[data-testid="train-connect-button"]')
+    ).toBeVisible({ timeout: APP_READY_TIMEOUT });
   });
 
-  test('drawing: canvas is absent so no draw interaction is possible', async ({
+  test('drawing canvas is present — predict flow is available without wallet', async ({
     page,
   }) => {
-    // Confirms the predict/draw flow is fully gated behind wallet connection
     const canvas = page.locator('canvas').first();
-    await expect(canvas).not.toBeVisible();
+    await expect(canvas).toBeVisible({ timeout: APP_READY_TIMEOUT });
   });
 });

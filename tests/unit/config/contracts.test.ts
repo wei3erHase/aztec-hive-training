@@ -10,34 +10,34 @@ import {
 
 // Read addresses straight from the source so tests never go stale after a redeployment
 import deployedJson from '../../../config/deployed.json';
-const DEVNET_MLP_ADDRESS: string =
-  deployedJson.devnet.multiLayerPerceptron.address;
-const DEVNET_CNN_ADDRESS: string = deployedJson.devnet.cnnGap.address;
+const TESTNET_MLP_ADDRESS: string =
+  deployedJson.testnet.multiLayerPerceptron.address;
+const TESTNET_CNN_ADDRESS: string = deployedJson.testnet.cnnGap.address;
 
 afterEach(() => {
   clearDeploymentConfigOverride();
 });
 
 describe('getDeploymentConfig', () => {
-  describe('devnet', () => {
+  describe('testnet', () => {
     it('returns the correct networkId', () => {
-      expect(getDeploymentConfig('devnet').networkId).toBe('devnet');
+      expect(getDeploymentConfig('testnet').networkId).toBe('testnet');
     });
 
     it('returns the MLP address from deployed.json', () => {
-      const config = getDeploymentConfig('devnet');
+      const config = getDeploymentConfig('testnet');
       expect(config.contracts.multiLayerPerceptron.address).toBe(
-        DEVNET_MLP_ADDRESS
+        TESTNET_MLP_ADDRESS
       );
     });
 
     it('returns the CNN-GAP address from deployed.json', () => {
-      const config = getDeploymentConfig('devnet');
-      expect(config.contracts.cnnGap.address).toBe(DEVNET_CNN_ADDRESS);
+      const config = getDeploymentConfig('testnet');
+      expect(config.contracts.cnnGap.address).toBe(TESTNET_CNN_ADDRESS);
     });
 
     it('includes the correct artifact identifier for each contract', () => {
-      const config = getDeploymentConfig('devnet');
+      const config = getDeploymentConfig('testnet');
       expect(config.contracts.singleLayer.artifact).toBe(
         'single_layer_contract-SingleLayer'
       );
@@ -48,7 +48,7 @@ describe('getDeploymentConfig', () => {
     });
 
     it('sets lazyRegister to true for all contracts', () => {
-      const config = getDeploymentConfig('devnet');
+      const config = getDeploymentConfig('testnet');
       expect(config.contracts.singleLayer.lazyRegister).toBe(true);
       expect(config.contracts.multiLayerPerceptron.lazyRegister).toBe(true);
       expect(config.contracts.cnnGap.lazyRegister).toBe(true);
@@ -103,10 +103,10 @@ describe('setDeploymentConfigOverride / clearDeploymentConfigOverride', () => {
     setDeploymentConfigOverride('local-network', {
       contracts: { singleLayer: { address: '0xdeadbeef' } },
     });
-    // devnet should still return the real address
+    // testnet should still return the real address
     expect(
-      getDeploymentConfig('devnet').contracts.multiLayerPerceptron.address
-    ).toBe(DEVNET_MLP_ADDRESS);
+      getDeploymentConfig('testnet').contracts.multiLayerPerceptron.address
+    ).toBe(TESTNET_MLP_ADDRESS);
   });
 
   it('clearDeploymentConfigOverride restores the original config', () => {
@@ -121,14 +121,14 @@ describe('setDeploymentConfigOverride / clearDeploymentConfigOverride', () => {
 });
 
 describe('getContractAddress', () => {
-  it('returns the MLP address for devnet', () => {
-    expect(getContractAddress('multiLayerPerceptron', 'devnet')).toBe(
-      DEVNET_MLP_ADDRESS
+  it('returns the MLP address for testnet', () => {
+    expect(getContractAddress('multiLayerPerceptron', 'testnet')).toBe(
+      TESTNET_MLP_ADDRESS
     );
   });
 
-  it('returns the CNN-GAP address for devnet', () => {
-    expect(getContractAddress('cnnGap', 'devnet')).toBe(DEVNET_CNN_ADDRESS);
+  it('returns the CNN-GAP address for testnet', () => {
+    expect(getContractAddress('cnnGap', 'testnet')).toBe(TESTNET_CNN_ADDRESS);
   });
 
   it('returns empty string for local-network (no deployment)', () => {

@@ -12,11 +12,12 @@ import {
 } from './aztec-wallet';
 
 const config = createAztecWalletConfig({
-  networks: [{ name: 'devnet', nodeUrl: 'https://devnet.aztec.network' }],
+  networks: [
+    { name: 'testnet', nodeUrl: 'https://rpc.testnet.aztec-labs.com/' },
+  ],
   walletGroups: {
     embedded: true,
-    evmWallets: ['metamask', 'rabby'],
-    aztecWallets: ['azguard'],
+    walletSdk: true,
   },
   showNetworkPicker: 'full',
 });
@@ -36,19 +37,18 @@ function App() {
 createAztecWalletConfig({
   // Required: Available networks
   networks: [
-    { name: 'devnet', nodeUrl: 'https://devnet.aztec.network' },
+    { name: 'testnet', nodeUrl: 'https://rpc.testnet.aztec-labs.com/' },
     { name: 'local-network', nodeUrl: 'http://localhost:8080' },
   ],
 
   // Required: Wallet types to enable
   walletGroups: {
     embedded: true, // App-managed wallet (keys in localStorage)
-    evmWallets: ['metamask', 'rabby'], // EVM wallets as signers
-    aztecWallets: ['azguard'], // Browser extension wallets
+    walletSdk: true, // External wallets via @aztec/wallet-sdk protocol
   },
 
   // Optional
-  defaultNetwork: 'devnet', // First network if not specified
+  defaultNetwork: 'testnet', // First network if not specified
   showNetworkPicker: 'full' | 'compact', // Show network picker in ConnectButton
   modal: { title: '...', subtitle: '...' },
   onConnect: (account) => {},
@@ -59,11 +59,10 @@ createAztecWalletConfig({
 
 ### Wallet Types
 
-| Type               | Signing                   | PXE               | Use Case                    |
-| ------------------ | ------------------------- | ----------------- | --------------------------- |
-| **Embedded**       | Internal (localStorage)   | App-managed       | Development, quick testing  |
-| **EVM Wallet**     | External (MetaMask, etc.) | App-managed       | Users with existing wallets |
-| **Browser Wallet** | Extension (Azguard)       | Extension-managed | Production apps             |
+| Type           | Signing                          | PXE            | Use Case                   |
+| -------------- | -------------------------------- | -------------- | -------------------------- |
+| **Embedded**   | Internal (localStorage)          | App-managed    | Development, quick testing |
+| **Wallet SDK** | External (via @aztec/wallet-sdk) | Wallet-managed | Production apps            |
 
 ## Hooks
 

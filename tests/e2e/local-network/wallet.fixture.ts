@@ -133,16 +133,43 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
       await expect(embeddedBtn).toBeVisible({ timeout: 10_000 });
       await embeddedBtn.click();
 
-      // Wait until the canvas panel appears — signals a successful connection
-      // (account deployed on-chain via sponsored fees, PXE ready)
-      await expect(page.locator('[data-testid="canvas-panel"]')).toBeVisible({
-        timeout: 180_000,
-      });
-
-      // Read credentials that the app stored in localStorage
-      const credentials = await page.evaluate<StoredAccountData>(() =>
-        JSON.parse(localStorage.getItem('aztec-embedded-account') ?? '{}')
-      );
+      // Wait until the embedded-account credentials are stored in localStorage.
+      // We cannot rely on canvas-panel appearing (the app now shows canvas
+      // even without a connected wallet). Credentials are only written AFTER
+      // the account has been deployed on-chain and the PXE is ready.
+      // Allow up to 8 minutes: on a cold start (first worker) the WASM PXE
+      // bundle loads, the sequencer processes the deployment tx, and the PXE
+      // syncs — all of which can take 4-6 minutes on a loaded machine.
+      const CREDS_TIMEOUT_MS = 480_000;
+      const credDeadline = Date.now() + CREDS_TIMEOUT_MS;
+      let credentials: StoredAccountData = {} as StoredAccountData;
+      while (Date.now() < credDeadline) {
+        const raw = await page.evaluate(() =>
+          localStorage.getItem('aztec-embedded-account')
+        );
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw) as StoredAccountData;
+            if (
+              parsed.secretKey &&
+              parsed.signingKey &&
+              parsed.salt &&
+              parsed.address
+            ) {
+              credentials = parsed;
+              break;
+            }
+          } catch {
+            // malformed JSON, keep waiting
+          }
+        }
+        await page.waitForTimeout(2_000);
+      }
+      if (!credentials.address) {
+        throw new Error(
+          'walletCredentials: timed out waiting for embedded-account credentials in localStorage'
+        );
+      }
 
       await context.close();
       await use(credentials);
@@ -188,7 +215,7 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
     // initialise and register (no deployment wait). Still allow generous time
     // for the WASM PXE bundle to load and sync.
     await expect(page.locator('[data-testid="canvas-panel"]')).toBeVisible({
-      timeout: 180_000,
+      timeout: 240_000,
     });
 
     await use(page);

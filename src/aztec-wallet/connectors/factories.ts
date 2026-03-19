@@ -1,6 +1,5 @@
-import { createAzguardAdapter } from '../adapters';
-import { BrowserWalletConnector } from './BrowserWalletConnector';
 import { createEmbeddedConnector } from './EmbeddedConnector';
+import { createWalletSDKConnector } from './WalletSDKConnector';
 import type { ConnectorFactory } from './registry';
 
 /**
@@ -11,13 +10,8 @@ import type { ConnectorFactory } from './registry';
 export const embedded = (): ConnectorFactory => createEmbeddedConnector;
 
 /**
- * Azguard wallet connector preset.
- * Uses external PXE (browser extension).
- * Usage: connectors: [azguard()]
+ * Wallet SDK connector preset.
+ * Discovers any Aztec extension wallet that implements the SDK protocol.
+ * Usage: connectors: [walletSdk()]
  */
-export const azguard = (): ConnectorFactory => () =>
-  new BrowserWalletConnector({
-    id: 'azguard',
-    label: 'Azguard Wallet',
-    adapterFactory: createAzguardAdapter,
-  });
+export const walletSdk = (): ConnectorFactory => createWalletSDKConnector;

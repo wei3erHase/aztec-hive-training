@@ -29,6 +29,11 @@ export const MainView: React.FC = () => {
     await onConnect('embedded', 'embedded');
   }, [setConnectingState, setView, onConnect, isLoading]);
 
+  const handleWalletSDKClick = useCallback(() => {
+    if (isLoading) return;
+    setView('wallet-sdk-discovery');
+  }, [setView, isLoading]);
+
   const handleAztecWalletsClick = useCallback(() => {
     if (isLoading) return;
     setView('aztec-wallets');
@@ -46,11 +51,20 @@ export const MainView: React.FC = () => {
       {walletGroups.embedded && (
         <WalletGroupButton
           label={walletGroups.embedded.label || 'Embedded Wallet'}
-          tag="Beta"
+          tag="TEST"
           showArrow={false}
           onClick={handleEmbeddedClick}
           disabled={isLoading}
           data-testid="wallet-group-embedded"
+        />
+      )}
+
+      {walletGroups.walletSdk && (
+        <WalletGroupButton
+          label={walletGroups.walletSdk.label || 'Aztec Wallet'}
+          onClick={handleWalletSDKClick}
+          disabled={isLoading}
+          data-testid="wallet-group-wallet-sdk"
         />
       )}
 

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { DEVNET_CONFIG } from '../../config/networks/devnet';
 import { LOCAL_NETWORK_CONFIG } from '../../config/networks/local-network';
+import { TESTNET_CONFIG } from '../../config/networks/testnet';
 import type { AztecNetwork } from '../../config/networks/constants';
 
 const CHECK_INTERVAL = 30000;
@@ -15,7 +15,7 @@ export interface NetworkAvailability {
 
 const NETWORK_CONFIGS: Record<AztecNetwork, { nodeUrl: string }> = {
   'local-network': LOCAL_NETWORK_CONFIG,
-  devnet: DEVNET_CONFIG,
+  testnet: TESTNET_CONFIG,
 };
 
 function isLocalhost(url: string): boolean {
@@ -82,7 +82,7 @@ export function useNetworkAvailability(): NetworkAvailability {
     staleTime: CHECK_INTERVAL - 1000,
   });
 
-  const networks = (['local-network', 'devnet'] as const).reduce(
+  const networks = (['local-network', 'testnet'] as const).reduce(
     (acc, network) => {
       const available = data?.[network];
       acc[network] =
