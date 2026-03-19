@@ -662,16 +662,6 @@
   resolved "https://registry.yarnpkg.com/@aws/lambda-invoke-store/-/lambda-invoke-store-0.2.3.tgz#f1137f56209ccc69c15f826242cbf37f828617dd"
   integrity sha512-oLvsaPMTBejkkmHhjf09xTgk71mOqyr/409NKhRIL08If7AhVfUsJhVsx386uJaqNd42v9kWamQ9lFbkoC2dYw==
 
-"@azguardwallet/client@0.8.0":
-  version "0.8.0"
-  resolved "https://registry.yarnpkg.com/@azguardwallet/client/-/client-0.8.0.tgz#59bfe4276cf5d165b176177eeb20cce345eef929"
-  integrity sha512-uOZoLdSO1PpjWmnWEEBKra3lrKvu9dl0utLds70LwpCw+zjf41fv/THhNSF+wa/4r2doGrKBI5macyz2mGWd4Q==
-
-"@azguardwallet/types@0.8.0":
-  version "0.8.0"
-  resolved "https://registry.yarnpkg.com/@azguardwallet/types/-/types-0.8.0.tgz#d75de19ed15b80842e887fc69bf61f7afe20b081"
-  integrity sha512-owAHzqwZJIUyCcdVTj8KCuYQ8vBa7HpzBOJuK6ohuQPUadltvIa23Y1H150nztPyWZkUvdWVtIpM6tgQwIrmFA==
-
 "@aztec/accounts@4.1.0-rc.4":
   version "4.1.0-rc.4"
   resolved "https://registry.yarnpkg.com/@aztec/accounts/-/accounts-4.1.0-rc.4.tgz#0a482de6edb32436df8f7ad8ccddc8e010ef0ade"
@@ -1477,9 +1467,10 @@
   resolved "https://registry.yarnpkg.com/@csstools/css-tokenizer/-/css-tokenizer-4.0.0.tgz#798a33950d11226a0ebb6acafa60f5594424967f"
   integrity sha512-QxULHAm7cNu72w97JUNCBFODFaXpbDg+dP8b/oWFAZ2MTRppA3U00Y2L1HqaS4J6yBqxwa/Y3nMBaxVKbB/NsA==
 
-"@defi-wonderland/aztec-benchmark@https://github.com/defi-wonderland/aztec-benchmark/releases/download/prerelease-c38aee2/defi-wonderland-aztec-benchmark-4.1.0-rc.4-prerelease.c38aee2.tgz":
-  version "4.1.0-rc.4-prerelease.c38aee2"
-  resolved "https://github.com/defi-wonderland/aztec-benchmark/releases/download/prerelease-c38aee2/defi-wonderland-aztec-benchmark-4.1.0-rc.4-prerelease.c38aee2.tgz#7f0d3b713f527545a96b1f7ee65a5f14bad0df20"
+"@defi-wonderland/aztec-benchmark@4.1.0-rc.4":
+  version "4.1.0-rc.4"
+  resolved "https://registry.yarnpkg.com/@defi-wonderland/aztec-benchmark/-/aztec-benchmark-4.1.0-rc.4.tgz#b20f3920efd96b07335762378ac7518dfc38f336"
+  integrity sha512-hcJScfteF4t9i1RYsA0Vyhpo5jk7UZ3o/b3i6aMnTBIukltdniHYKKay7y3R5DNJ39LXBfXpAEPwx9E7MFd5dg==
   dependencies:
     "@actions/core" "1.10.1"
     "@actions/exec" "1.1.1"
