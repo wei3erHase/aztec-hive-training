@@ -29,8 +29,6 @@ scripts/.store*
 ./wallet-info.json
 config/deployed.local.json
 .deploy-store
-pxe/
-
 contracts/target
 target/
 src/target/

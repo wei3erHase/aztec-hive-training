@@ -7,10 +7,10 @@ export const walletConfig = createAztecWalletConfig({
     nodeUrl: n.nodeUrl,
     displayName: n.displayName,
   })),
-  defaultNetwork: 'devnet',
+  defaultNetwork: 'testnet',
   showNetworkPicker: 'full',
   walletGroups: {
     embedded: true,
-    aztecWallets: ['azguard'],
+    walletSdk: true,
   },
 });

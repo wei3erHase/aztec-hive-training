@@ -50,7 +50,7 @@ export const NetworkSelector: React.FC<NetworkSelectorProps> = ({
   onSelectNetwork,
   networkConfigs,
 }) => {
-  const networks: AztecNetwork[] = ['local-network', 'devnet'];
+  const networks: AztecNetwork[] = ['local-network', 'testnet'];
 
   return (
     <div className={styles.container}>
@@ -98,7 +98,7 @@ export const NetworkSelector: React.FC<NetworkSelectorProps> = ({
         <div className={styles.tipContent}>
           <span className={styles.tipTitle}>Quick Tip</span>
           <p className={styles.tipText}>
-            Use Local Network for fast local testing. Switch to Devnet for
+            Use Local Network for fast local testing. Switch to Testnet for
             production testing.
           </p>
         </div>

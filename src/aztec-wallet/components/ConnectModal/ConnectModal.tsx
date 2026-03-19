@@ -14,6 +14,8 @@ import {
   EVMWalletsView,
   ConnectingView,
   SuccessView,
+  WalletSDKDiscoveryView,
+  WalletSDKVerificationView,
 } from './views';
 import type { ResolvedAztecWalletConfig, ModalWalletType } from '../../types';
 
@@ -41,33 +43,15 @@ const ModalContent: React.FC = () => {
             </DialogDescription>
           </DialogHeader>
         );
-      case 'aztec-wallets':
-        // Visually hidden title for accessibility
+      case 'wallet-sdk-verification':
         return (
-          <VisuallyHidden>
-            <DialogTitle>Select Aztec Wallet</DialogTitle>
-          </VisuallyHidden>
-        );
-      case 'evm-wallets':
-        // Visually hidden title for accessibility
-        return (
-          <VisuallyHidden>
-            <DialogTitle>Select EVM Wallet</DialogTitle>
-          </VisuallyHidden>
-        );
-      case 'connecting':
-        // Visually hidden title for accessibility
-        return (
-          <VisuallyHidden>
-            <DialogTitle>Connecting Wallet</DialogTitle>
-          </VisuallyHidden>
-        );
-      case 'success':
-        // Visually hidden title for accessibility
-        return (
-          <VisuallyHidden>
-            <DialogTitle>Connection Successful</DialogTitle>
-          </VisuallyHidden>
+          <DialogHeader className={styles.header}>
+            <DialogTitle>Verify Connection</DialogTitle>
+            <DialogDescription>
+              Confirm these emojis match your wallet to complete the secure
+              connection.
+            </DialogDescription>
+          </DialogHeader>
         );
       default:
         return (
@@ -87,6 +71,10 @@ const ModalContent: React.FC = () => {
         return <AztecWalletsView />;
       case 'evm-wallets':
         return <EVMWalletsView />;
+      case 'wallet-sdk-discovery':
+        return <WalletSDKDiscoveryView />;
+      case 'wallet-sdk-verification':
+        return <WalletSDKVerificationView />;
       case 'connecting':
         return <ConnectingView />;
       case 'success':

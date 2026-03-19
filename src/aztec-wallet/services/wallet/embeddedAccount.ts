@@ -231,7 +231,10 @@ export async function loadExistingEmbeddedAccount(
 
   // Try saved credentials
   const saved = getSavedAccount();
-  if (saved) {
+  // Reject malformed/incomplete credentials (e.g. empty object `{}`).
+  const hasSavedCredentials =
+    saved && saved.secretKey && saved.signingKey && saved.salt && saved.address;
+  if (hasSavedCredentials) {
     try {
       const credentials: AccountCredentials = {
         secretKey: Fr.fromString(saved.secretKey),
@@ -269,16 +272,28 @@ async function connectWithCredentials(
   );
 
   const account = await accountManager.getAccount();
-  const instance = accountManager.getInstance();
-  const artifact = await accountManager
-    .getAccountContract()
-    .getContractArtifact();
-  await wallet.registerContract(
-    instance,
-    artifact,
-    accountManager.getSecretKey()
+
+  // SharedPXEService.initializeInstance pre-registers the saved account during
+  // PXE init so the block stream can sync the signing-key note without racing
+  // against this IDB write. Skip re-registration if already done.
+  const existingAccounts = await wallet.getAccounts();
+  const alreadyInWallet = existingAccounts.some(
+    (a) =>
+      (a.item as { toString: () => string }).toString() ===
+      accountManager.address.toString()
   );
-  wallet.addAccount(account);
+  if (!alreadyInWallet) {
+    const instance = accountManager.getInstance();
+    const artifact = await accountManager
+      .getAccountContract()
+      .getContractArtifact();
+    await wallet.registerContract(
+      instance,
+      artifact,
+      accountManager.getSecretKey()
+    );
+    wallet.addAccount(account);
+  }
 
   // Deploy account if not yet initialized (e.g., local network was restarted)
   // Hard timeout to prevent simulation from hanging indefinitely

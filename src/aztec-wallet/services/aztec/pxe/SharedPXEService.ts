@@ -1,4 +1,5 @@
 import { AztecAddress } from '@aztec/aztec.js/addresses';
+import { getContractInstanceFromInstantiationParams } from '@aztec/aztec.js/contracts';
 import { SponsoredFeePaymentMethod } from '@aztec/aztec.js/fee';
 import { Fr } from '@aztec/aztec.js/fields';
 import { createLogger } from '@aztec/aztec.js/log';
@@ -9,6 +10,7 @@ import { SponsoredFPCContractArtifact } from '@aztec/noir-contracts.js/Sponsored
 import { createPXE } from '@aztec/pxe/client/bundle';
 import { getPXEConfig } from '@aztec/pxe/config';
 import type { PXE } from '@aztec/pxe/server';
+import { getDeploymentConfig } from '../../../../config/contracts';
 import { AVAILABLE_NETWORKS } from '../../../../config/networks';
 import { FeePaymentRegister } from '../../../../services/aztec/feePayment/FeePaymentRegister';
 import { ZKMLContractRegister } from '../../../../services/aztec/zkml/ZKMLContractRegister';
@@ -215,7 +217,7 @@ class SharedPXEServiceClass {
 
     // Register the SponsoredFPC artifact so the PXE can resolve its function
     // selectors during fee payment simulation (e.g. when deploying an account).
-    await this.registerSponsoredFPC(pxe);
+    await this.registerSponsoredFPC(pxe, aztecNode, networkName);
 
     // Register fee payment contracts (look up config by network name)
     const feePaymentConfig = this.getFeePaymentConfig(networkName);
@@ -226,6 +228,11 @@ class SharedPXEServiceClass {
     const zkmlConfig = this.getZKMLConfig(networkName);
     const zkmlRegister = new ZKMLContractRegister();
     await zkmlRegister.registerAll(pxe, zkmlConfig);
+
+    // Pre-register all deployed ZKML contracts with their artifacts so that
+    // the first predict() call does not need to do IndexedDB writes while the
+    // block-stream processor is also writing (causing "transaction not active").
+    await this.preRegisterDeployedZKML(pxe, aztecNode, networkName);
 
     // Initialize storage service
     const storageService = new AztecStorageService();
@@ -242,7 +249,7 @@ class SharedPXEServiceClass {
       wallet,
       storageService,
       getSponsoredFeePaymentMethod: () =>
-        this.getSponsoredFeePaymentMethod(key, pxe),
+        this.getSponsoredFeePaymentMethod(key, aztecNode, networkName),
     };
 
     this.instances.set(key, {
@@ -301,8 +308,12 @@ class SharedPXEServiceClass {
     }
   }
 
-  private async registerSponsoredFPC(pxe: PXE): Promise<void> {
-    const instance = await this.getSponsoredPFCContract(pxe);
+  private async registerSponsoredFPC(
+    pxe: PXE,
+    aztecNode: AztecNode,
+    networkName: AztecNetwork
+  ): Promise<void> {
+    const instance = await this.getSponsoredPFCInstance(aztecNode, networkName);
     await pxe.registerContract({
       instance,
       artifact: SponsoredFPCContractArtifact,
@@ -310,36 +321,129 @@ class SharedPXEServiceClass {
     logger.info(`Registered SponsoredFPC at ${instance.address}`);
   }
 
-  private async getSponsoredPFCContract(_pxe: PXE) {
-    const { getContractInstanceFromInstantiationParams } = await import(
-      '@aztec/aztec.js/contracts'
+  /**
+   * Returns the SponsoredFPC contract instance.
+   *
+   * For networks that declare a `sponsoredFpcAddress`, the instance is fetched
+   * directly from the node — the salt never appears in client-side code.
+   * For local-network (no address configured), falls back to computing it from
+   * the canonical salt (0).
+   */
+  private async getSponsoredPFCInstance(
+    aztecNode: AztecNode,
+    networkName: AztecNetwork
+  ) {
+    const networkConfig = AVAILABLE_NETWORKS.find(
+      (n) => n.name === networkName
     );
+
+    if (networkConfig?.sponsoredFpcAddress) {
+      const address = AztecAddress.fromString(
+        networkConfig.sponsoredFpcAddress
+      );
+      const instance = await aztecNode.getContract(address);
+      if (!instance) {
+        throw new Error(
+          `SponsoredFPC instance not found on node at ${networkConfig.sponsoredFpcAddress}`
+        );
+      }
+      return instance;
+    }
 
     return await getContractInstanceFromInstantiationParams(
       SponsoredFPCContractArtifact,
-      {
-        salt: new Fr(SPONSORED_FPC_SALT),
-      }
+      { salt: new Fr(SPONSORED_FPC_SALT) }
     );
   }
 
   private async getSponsoredFeePaymentMethod(
     key: string,
-    pxe: PXE
+    aztecNode: AztecNode,
+    networkName: AztecNetwork
   ): Promise<SponsoredFeePaymentMethod> {
     const cached = this.cachedPaymentMethods.get(key);
     if (cached) {
       return cached;
     }
 
-    const sponsoredPFCContract = await this.getSponsoredPFCContract(pxe);
-    const paymentMethod = new SponsoredFeePaymentMethod(
-      sponsoredPFCContract.address
-    );
+    const instance = await this.getSponsoredPFCInstance(aztecNode, networkName);
+    const paymentMethod = new SponsoredFeePaymentMethod(instance.address);
 
     this.cachedPaymentMethods.set(key, paymentMethod);
 
     return paymentMethod;
+  }
+
+  /**
+   * Pre-registers all deployed ZKML contracts with the PXE so that the first
+   * predict() call does not trigger IndexedDB writes that compete with the
+   * running block-stream processor (which would cause "transaction not active"
+   * errors and silent prediction hangs).
+   *
+   * Failures are non-fatal — a contract that is not deployed yet simply has no
+   * address and is skipped.
+   */
+  private async preRegisterDeployedZKML(
+    pxe: PXE,
+    aztecNode: AztecNode,
+    networkName: AztecNetwork
+  ): Promise<void> {
+    try {
+      const config = getDeploymentConfig(networkName);
+
+      const candidates: {
+        key: keyof typeof config.contracts;
+        getArtifact: () => Promise<unknown>;
+      }[] = [
+        {
+          key: 'singleLayer',
+          getArtifact: async () =>
+            (await import('../../../../artifacts/SingleLayer'))
+              .SingleLayerContractArtifact,
+        },
+        {
+          key: 'multiLayerPerceptron',
+          getArtifact: async () =>
+            (await import('../../../../artifacts/MultiLayerPerceptron'))
+              .MultiLayerPerceptronContractArtifact,
+        },
+        {
+          key: 'cnnGap',
+          getArtifact: async () =>
+            (await import('../../../../artifacts/CNNGAP'))
+              .CNNGAPContractArtifact,
+        },
+      ];
+
+      for (const { key, getArtifact } of candidates) {
+        const contractAddress = config.contracts[key]?.address;
+        if (!contractAddress) continue;
+
+        try {
+          const address = AztecAddress.fromString(contractAddress);
+          let instance = await pxe.getContractInstance(address);
+          if (!instance) {
+            instance = await aztecNode.getContract(address);
+          }
+          if (!instance) continue;
+
+          const artifact = await getArtifact();
+          await pxe.registerContract({
+            instance,
+            artifact: artifact as Parameters<
+              typeof pxe.registerContract
+            >[0]['artifact'],
+          });
+          logger.info(
+            `Pre-registered ZKML contract ${key} at ${contractAddress}`
+          );
+        } catch (err) {
+          logger.warn(`Failed to pre-register ZKML contract ${key}:`, err);
+        }
+      }
+    } catch (err) {
+      logger.warn('Failed to pre-register ZKML contracts:', err);
+    }
   }
 
   private async registerSavedSenders(

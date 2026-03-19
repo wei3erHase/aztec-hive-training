@@ -52,7 +52,7 @@ export const ArchitectureSelector: React.FC<ArchitectureSelectorProps> = ({
       <Badge variant="warning" className="mb-4 w-full justify-start">
         {ARCH_LABELS[architecture]} is not deployed on this network. Use the
         local network for all architectures, or choose Multi-Layer Network on
-        devnet.
+        testnet.
       </Badge>
     )}
 

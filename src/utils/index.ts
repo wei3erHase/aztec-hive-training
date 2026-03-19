@@ -1,7 +1,7 @@
 export { MinimalWallet } from './MinimalWallet';
 export { queuePxeCall } from './pxeQueue';
 export { toTitleCase } from './string';
-export { parseAddressFromCaip, getChainFromCaipAccount } from './azguard';
+export { parseAddressFromCaip, getChainFromCaipAccount } from './caip';
 export { cn } from './cn';
 export { iconSize, type IconSize } from './iconSize';
 export { truncateAddress } from './truncateAddress';

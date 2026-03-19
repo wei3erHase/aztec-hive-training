@@ -28,8 +28,8 @@ const NETWORK_INFO: Record<
     subtitle: 'Local Development',
     icon: <Home size={iconSize('md')} />,
   },
-  devnet: {
-    title: 'Devnet',
+  testnet: {
+    title: 'Testnet',
     subtitle: 'Public Testnet',
     icon: <Globe size={iconSize('md')} />,
   },

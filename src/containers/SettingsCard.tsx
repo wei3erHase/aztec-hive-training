@@ -3,8 +3,8 @@ import { RefreshCw } from 'lucide-react';
 import { useAztecWallet, hasAppManagedPXE } from '../aztec-wallet';
 import { NetworkSelector, ConfigPanel } from '../components/settings';
 import { Button } from '../components/ui';
-import { DEVNET_CONFIG } from '../config/networks/devnet';
 import { LOCAL_NETWORK_CONFIG } from '../config/networks/local-network';
+import { TESTNET_CONFIG } from '../config/networks/testnet';
 import { useNetworkAvailability, useNetworkHealth } from '../hooks';
 import { iconSize } from '../utils';
 import type { AztecNetwork } from '../config/networks/constants';
@@ -15,7 +15,7 @@ const styles = {
 
 const NETWORK_CONFIGS = {
   'local-network': LOCAL_NETWORK_CONFIG,
-  devnet: DEVNET_CONFIG,
+  testnet: TESTNET_CONFIG,
 } as const;
 
 export const SettingsCard: React.FC = () => {
@@ -26,7 +26,7 @@ export const SettingsCard: React.FC = () => {
   const networkAvailability = useNetworkAvailability();
   const [isSwitching, setIsSwitching] = useState(false);
 
-  const activeNetwork = (networkName ?? 'devnet') as AztecNetwork;
+  const activeNetwork = (networkName ?? 'testnet') as AztecNetwork;
   const [selectedNetwork, setSelectedNetwork] =
     useState<AztecNetwork>(activeNetwork);
 
@@ -95,7 +95,7 @@ export const SettingsCard: React.FC = () => {
           'local-network': {
             proverEnabled: NETWORK_CONFIGS['local-network'].proverEnabled,
           },
-          devnet: { proverEnabled: NETWORK_CONFIGS.devnet.proverEnabled },
+          testnet: { proverEnabled: NETWORK_CONFIGS.testnet.proverEnabled },
         }}
       />
       <ConfigPanel config={selectedConfig} action={switchAction} />

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import {
   LOCAL_NETWORK_CONFIG,
-  DEVNET_CONFIG,
+  TESTNET_CONFIG,
   type NetworkConfig,
 } from '../../../config/networks';
 import { isValidConfig } from '../../../utils';
@@ -13,7 +13,7 @@ const STORAGE_KEY = 'aztec-wallet-network';
 
 const BASE_CONFIGS: Record<AztecNetwork, NetworkConfig> = {
   'local-network': LOCAL_NETWORK_CONFIG,
-  devnet: DEVNET_CONFIG,
+  testnet: TESTNET_CONFIG,
 };
 
 type State = {
@@ -33,9 +33,9 @@ type Actions = {
 export type NetworkStore = State & Actions;
 
 const INITIAL_STATE: State = {
-  currentConfig: DEVNET_CONFIG,
+  currentConfig: TESTNET_CONFIG,
   configuredNetworks: {} as Record<AztecNetwork, NetworkConfig>,
-  defaultNetwork: 'devnet',
+  defaultNetwork: 'testnet',
   isInitialized: false,
 };
 
@@ -55,7 +55,7 @@ export const useNetworkStore = create<NetworkStore>((set, get) => ({
       }
     }
 
-    const defaultNetwork = presets[0]?.aztecNetwork ?? 'devnet';
+    const defaultNetwork = presets[0]?.aztecNetwork ?? 'testnet';
     const defaultConfig =
       configuredNetworks[defaultNetwork] ?? LOCAL_NETWORK_CONFIG;
 

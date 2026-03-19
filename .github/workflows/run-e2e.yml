@@ -31,7 +31,7 @@ jobs:
           run-codegen: "true"
 
       - name: Deploy contracts to local network
-        run: VITE_PROVER_ENABLED=false yarn deploy-contracts:local-network
+        run: yarn deploy-contracts:local-network
 
       - name: Build app
         run: yarn build-app:ci

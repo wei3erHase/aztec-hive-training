@@ -4,7 +4,6 @@ import { useAztecWallet } from '../aztec-wallet/hooks/useAztecWallet';
 import { useConnectModal } from '../aztec-wallet/hooks/useConnectModal';
 import { DrawingCanvas } from '../components/canvas';
 import { ArchitectureSelector } from '../components/home/ArchitectureSelector';
-import { ConnectPrompt } from '../components/home/ConnectPrompt';
 import { HeroSection } from '../components/home/HeroSection';
 import { LocalNetworkWarning } from '../components/home/LocalNetworkWarning';
 import { PredictionMatrix } from '../components/home/PredictionMatrix';
@@ -213,9 +212,10 @@ export const Home: React.FC = () => {
       if (!result.success)
         throw new Error(result.error || 'Failed to submit training');
 
-      const shortHash = result.txHash
-        ? `${result.txHash.slice(0, 10)}...${result.txHash.slice(-6)}`
-        : 'confirmed';
+      const shortHash =
+        result.txHash && result.txHash.length > 16
+          ? `${result.txHash.slice(0, 10)}...${result.txHash.slice(-6)}`
+          : result.txHash || 'confirmed';
       toast.dismiss(loadingId);
       setStatusMessage(`Training submitted! TX: ${shortHash}`);
       setTrainStatus('success');
@@ -312,97 +312,95 @@ export const Home: React.FC = () => {
           animate={{ opacity: 1 }}
           transition={{ delay: 0.15 }}
         >
-          {isConnected ? (
-            <div className="grid min-w-0 items-start gap-4 sm:gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-              <div className="min-w-0 space-y-4 sm:space-y-6">
-                <ArchitectureSelector
-                  architecture={architecture}
-                  isArchitectureAvailable={isArchitectureAvailable}
-                  onSelect={setArchitecture}
-                />
-                <div
-                  className="panel min-w-0 rounded-2xl p-4 sm:p-5"
-                  data-testid="canvas-panel"
-                >
-                  <DrawingCanvas
-                    onDraw={handleDraw}
-                    onClear={handleClear}
-                    disabled={
-                      !isInitialized || !canPredict || !isArchitectureAvailable
-                    }
-                    showPreview={true}
-                    brushSize={18}
-                    previewHeatmap={
-                      selectedLabel === null && prediction && explanation
-                        ? explanation.normalizedInputs
-                        : undefined
-                    }
-                    neuronHeatmap={
-                      selectedLabel === null && prediction && explanation
-                        ? explanation.normalizedNeurons
-                        : undefined
-                    }
-                    beforeHeatmap={
-                      selectedLabel !== null && beforeExplanation
-                        ? beforeExplanation.normalizedInputs
-                        : undefined
-                    }
-                    afterHeatmap={
-                      selectedLabel !== null && afterExplanation
-                        ? afterExplanation.normalizedInputs
-                        : undefined
-                    }
-                  />
-                </div>
-              </div>
-
-              <div className="min-w-0 space-y-4 sm:space-y-6">
-                <div className="relative min-w-0">
-                  <ThreeShapleyVisualizer
-                    architecture={architecture}
-                    probabilities={prediction?.probabilities}
-                    predictedDigit={selectedLabel ?? prediction?.digit ?? null}
-                    focusedDigit={
-                      visualMode === 'train-delta' ? null : selectedLabel
-                    }
-                    targetDigit={selectedLabel}
-                    inputShapley={visualInput}
-                    neuronShapley={visualNeurons}
-                    beforeInputShapley={visualBefore}
-                    afterInputShapley={visualAfter}
-                    mode={visualMode}
-                  />
-                </div>
-                <PredictionMatrix
-                  prediction={prediction}
-                  selectedLabel={selectedLabel}
-                  isExplaining={isExplaining}
-                  currentImage={currentImage}
-                  onLabelSelect={handleLabelSelect}
-                />
-                <PredictionStatus
-                  prediction={prediction}
-                  selectedLabel={selectedLabel}
-                  explanationProcessingTime={
-                    displayedExplanation?.processingTime ?? null
+          <div className="grid min-w-0 items-start gap-4 sm:gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+            <div className="min-w-0 space-y-4 sm:space-y-6">
+              <ArchitectureSelector
+                architecture={architecture}
+                isArchitectureAvailable={isArchitectureAvailable}
+                onSelect={setArchitecture}
+              />
+              <div
+                className="panel min-w-0 rounded-2xl p-4 sm:p-5"
+                data-testid="canvas-panel"
+              >
+                <DrawingCanvas
+                  onDraw={handleDraw}
+                  onClear={handleClear}
+                  disabled={
+                    !isInitialized || !canPredict || !isArchitectureAvailable
                   }
-                  predictError={predictError}
-                  explanationError={explanationError}
-                />
-                <TrainingControls
-                  currentImage={currentImage}
-                  selectedLabel={selectedLabel}
-                  trainStatus={trainStatus}
-                  statusMessage={statusMessage}
-                  isSubmittingOnChain={isSubmittingOnChain}
-                  trainingState={trainingState}
-                  onSubmit={handleSubmitTraining}
+                  showPreview={true}
+                  brushSize={18}
+                  previewHeatmap={
+                    selectedLabel === null && prediction && explanation
+                      ? explanation.normalizedInputs
+                      : undefined
+                  }
+                  neuronHeatmap={
+                    selectedLabel === null && prediction && explanation
+                      ? explanation.normalizedNeurons
+                      : undefined
+                  }
+                  beforeHeatmap={
+                    selectedLabel !== null && beforeExplanation
+                      ? beforeExplanation.normalizedInputs
+                      : undefined
+                  }
+                  afterHeatmap={
+                    selectedLabel !== null && afterExplanation
+                      ? afterExplanation.normalizedInputs
+                      : undefined
+                  }
                 />
               </div>
             </div>
-          ) : (
-            <ConnectPrompt onConnect={openConnectModal} />
-          )}
+
+            <div className="min-w-0 space-y-4 sm:space-y-6">
+              <div className="relative min-w-0">
+                <ThreeShapleyVisualizer
+                  architecture={architecture}
+                  probabilities={prediction?.probabilities}
+                  predictedDigit={selectedLabel ?? prediction?.digit ?? null}
+                  focusedDigit={
+                    visualMode === 'train-delta' ? null : selectedLabel
+                  }
+                  targetDigit={selectedLabel}
+                  inputShapley={visualInput}
+                  neuronShapley={visualNeurons}
+                  beforeInputShapley={visualBefore}
+                  afterInputShapley={visualAfter}
+                  mode={visualMode}
+                />
+              </div>
+              <PredictionMatrix
+                prediction={prediction}
+                selectedLabel={selectedLabel}
+                isExplaining={isExplaining}
+                currentImage={currentImage}
+                onLabelSelect={handleLabelSelect}
+              />
+              <PredictionStatus
+                prediction={prediction}
+                selectedLabel={selectedLabel}
+                explanationProcessingTime={
+                  displayedExplanation?.processingTime ?? null
+                }
+                predictError={predictError}
+                explanationError={explanationError}
+              />
+              <TrainingControls
+                currentImage={currentImage}
+                selectedLabel={selectedLabel}
+                trainStatus={trainStatus}
+                statusMessage={statusMessage}
+                isSubmittingOnChain={isSubmittingOnChain}
+                trainingState={trainingState}
+                isConnected={isConnected}
+                onSubmit={handleSubmitTraining}
+                onConnect={openConnectModal}
+              />
+            </div>
+          </div>
         </motion.section>
       </div>
     </>

@@ -37,6 +37,7 @@ ToastViewport.displayName = ToastPrimitive.Viewport.displayName;
  * Enter/exit animations handled via CSS in globals.css.
  * Swipe gestures handled via Tailwind data attributes below.
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export const toastVariants = cva(
   [
     'group pointer-events-auto relative flex w-full items-center justify-between',

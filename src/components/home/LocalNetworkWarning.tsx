@@ -41,8 +41,9 @@ export const LocalNetworkWarning: React.FC = () => (
       </li>
     </ol>
     <p className={styles.hint}>
-      Alternatively, switch to <strong className={styles.strong}>Devnet</strong>{' '}
-      in the network selector — contracts are already deployed there.
+      Alternatively, switch to{' '}
+      <strong className={styles.strong}>Testnet</strong> in the network selector
+      — contracts are already deployed there.
     </p>
   </motion.div>
 );

@@ -7,6 +7,7 @@ export type {
   StoreNetworkPreset,
   WalletGroupsConfig,
   EmbeddedGroupConfig,
+  WalletSDKGroupConfig,
   AztecWalletsGroupConfig,
   AztecBrowserWalletConfig,
   EVMWalletsGroupConfig,
@@ -19,7 +20,6 @@ export type {
   IAztecStorageService,
   CreateAccountResult,
   AccountCredentials,
-  AzguardAccountData,
   ModalWalletType,
 } from './aztec';
 export { WalletType, ExternalSignerType } from './aztec';
@@ -44,6 +44,8 @@ export type ModalView =
   | 'main'
   | 'aztec-wallets'
   | 'evm-wallets'
+  | 'wallet-sdk-discovery'
+  | 'wallet-sdk-verification'
   | 'connecting'
   | 'success';
 

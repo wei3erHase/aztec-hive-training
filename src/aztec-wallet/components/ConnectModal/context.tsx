@@ -7,6 +7,10 @@ import React, {
   useRef,
 } from 'react';
 import type {
+  WalletProvider,
+  PendingConnection,
+} from '@aztec/wallet-sdk/manager';
+import type {
   ResolvedAztecWalletConfig,
   ModalView,
   ModalWalletType,
@@ -20,6 +24,11 @@ interface ConnectingState {
 
 interface SuccessState {
   address: string;
+}
+
+export interface WalletSDKPendingState {
+  provider: WalletProvider;
+  pending: PendingConnection;
 }
 
 interface ConnectModalContextValue {
@@ -45,6 +54,10 @@ interface ConnectModalContextValue {
 
   // Loading state (prevents duplicate calls)
   isLoading: boolean;
+
+  // Wallet SDK pending connection state (discovery → verification handoff)
+  walletSDKPending: WalletSDKPendingState | null;
+  setWalletSDKPending: (state: WalletSDKPendingState | null) => void;
 
   // Actions
   onClose: () => void;
@@ -75,6 +88,8 @@ export const ConnectModalProvider: React.FC<ConnectModalProviderProps> = ({
   const [successState, setSuccessState] = useState<SuccessState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [walletSDKPending, setWalletSDKPending] =
+    useState<WalletSDKPendingState | null>(null);
   const connectingRef = useRef(false);
 
   const reset = useCallback(() => {
@@ -83,6 +98,7 @@ export const ConnectModalProvider: React.FC<ConnectModalProviderProps> = ({
     setSuccessState(null);
     setError(null);
     setIsLoading(false);
+    setWalletSDKPending(null);
     connectingRef.current = false;
   }, []);
 
@@ -90,6 +106,7 @@ export const ConnectModalProvider: React.FC<ConnectModalProviderProps> = ({
     setView('main');
     setError(null);
     setConnectingState(null);
+    setWalletSDKPending(null);
     setIsLoading(false);
     connectingRef.current = false;
   }, []);
@@ -142,6 +159,8 @@ export const ConnectModalProvider: React.FC<ConnectModalProviderProps> = ({
       error,
       setError,
       isLoading,
+      walletSDKPending,
+      setWalletSDKPending,
       onClose: handleClose,
       onConnect: handleConnect,
       reset,
@@ -154,6 +173,7 @@ export const ConnectModalProvider: React.FC<ConnectModalProviderProps> = ({
       successState,
       error,
       isLoading,
+      walletSDKPending,
       handleClose,
       handleConnect,
       reset,

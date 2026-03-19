@@ -1,6 +1,5 @@
 import type { AccountWithSecretKey } from '@aztec/aztec.js/account';
 import type { Fr } from '@aztec/aztec.js/fields';
-import type { CaipAccount } from '@azguardwallet/types';
 
 // ============================================================================
 // STORAGE SERVICE INTERFACES
@@ -52,12 +51,12 @@ export interface AccountCredentials {
  *
  * - EMBEDDED: App manages PXE + internal signing (keys stored in app)
  * - EXTERNAL_SIGNER: App manages PXE + external signing (MetaMask, WalletConnect, Ledger)
- * - BROWSER_WALLET: External PXE + external signing (Azguard extension)
+ * - WALLET_SDK: External wallet discovered via Aztec Wallet SDK protocol
  */
 export enum WalletType {
   EMBEDDED = 'embedded',
   EXTERNAL_SIGNER = 'external',
-  BROWSER_WALLET = 'browser',
+  WALLET_SDK = 'wallet-sdk',
 }
 
 /**
@@ -66,8 +65,6 @@ export enum WalletType {
  */
 export enum ExternalSignerType {
   EVM_WALLET = 'evm',
-  // Future possible signers:
-  // WALLET_CONNECT = 'walletconnect',
 }
 
 /**
@@ -75,20 +72,7 @@ export enum ExternalSignerType {
  *
  * Used in the connect modal to categorize wallet options:
  * - 'embedded': Built-in wallet with keys stored in the app
- * - 'aztec': Native Aztec browser wallets (e.g., Azguard)
+ * - 'wallet-sdk': Native Aztec extension wallets discovered via SDK protocol
  * - 'evm': External signers using EVM wallets (e.g., MetaMask)
  */
-export type ModalWalletType = 'embedded' | 'aztec' | 'evm';
-
-// ============================================================================
-// AZGUARD WALLET INTERFACES
-// ============================================================================
-
-/**
- * Azguard-specific account data for storage
- */
-export interface AzguardAccountData {
-  caipAccount: CaipAccount;
-  connectedAt: number;
-  lastUsed: number;
-}
+export type ModalWalletType = 'embedded' | 'wallet-sdk' | 'evm';

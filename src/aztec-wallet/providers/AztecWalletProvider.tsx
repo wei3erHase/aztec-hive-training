@@ -9,6 +9,7 @@ import {
   useWalletStore,
   getWalletStore,
   getStoredWalletConnection,
+  clearWalletConnection,
   setupWalletCrossTabSync,
 } from '../store/wallet';
 import { WalletType } from '../types/aztec';
@@ -99,10 +100,13 @@ const AutoReconnect: React.FC = () => {
             }
             break;
 
-          case WalletType.BROWSER_WALLET:
-            // For browser wallets, try to reconnect - if session exists it will be silent
-            console.log('AztecWallet: Auto-reconnecting to browser wallet...');
-            await walletActions.connect(connectorId);
+          case WalletType.WALLET_SDK:
+            // SDK wallets cannot be auto-reconnected (require interactive discovery + emoji verification).
+            // Clear the stale entry so the user starts from a clean disconnected state.
+            console.log(
+              'AztecWallet: Clearing stale wallet-sdk connection (user must reconnect manually)'
+            );
+            clearWalletConnection();
             break;
 
           default:

@@ -28,7 +28,11 @@ export default defineConfig({
 
   expect: { timeout: 30_000 },
 
-  timeout: 300_000,
+  // Allow 10 minutes per test — the first run for each test needs to:
+  // 1. Load the WASM PXE bundle and sync (30-60s on a loaded machine)
+  // 2. Execute private circuits (MLP can take 30-90s on first simulate)
+  // 3. Submit and wait for a tx to reach PROPOSED status (30-60s)
+  timeout: 600_000,
 
   projects: [
     {
