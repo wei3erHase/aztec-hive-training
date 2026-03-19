@@ -6,7 +6,20 @@
 
 import { useState, useCallback } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import { EcdsaRAccountContract } from '@aztec/accounts/ecdsa/lazy';
+import type { AccountWithSecretKey } from '@aztec/aztec.js/account';
+import { AztecAddress } from '@aztec/aztec.js/addresses';
+import { getContractInstanceFromInstantiationParams } from '@aztec/aztec.js/contracts';
+import { SponsoredFeePaymentMethod } from '@aztec/aztec.js/fee';
+import { Fr } from '@aztec/aztec.js/fields';
+import { createAztecNodeClient } from '@aztec/aztec.js/node';
+import type { Wallet } from '@aztec/aztec.js/wallet';
+import { AccountManager } from '@aztec/aztec.js/wallet';
+import { SPONSORED_FPC_SALT } from '@aztec/constants';
+import { SponsoredFPCContractArtifact } from '@aztec/noir-contracts.js/SponsoredFPC';
+import { TxStatus } from '@aztec/stdlib/tx';
 import { useAztecWallet } from '../../aztec-wallet/hooks/useAztecWallet';
+import { SharedPXEService } from '../../aztec-wallet/services/aztec/pxe';
 import { deployAccountIfNotExists } from '../../aztec-wallet/services/wallet/deployAccount';
 import { getSavedAccount } from '../../aztec-wallet/services/wallet/embeddedAccount';
 import { useWalletStore } from '../../aztec-wallet/store/wallet';
@@ -16,6 +29,7 @@ import {
   getContractKeyForArchitecture,
   type ArchitectureId,
 } from '../../config/contracts';
+import { AVAILABLE_NETWORKS } from '../../config/networks';
 import { FIELD_MODULUS } from '../../utils/zkml';
 import type {
   TrainingTxData,
@@ -182,8 +196,8 @@ async function submitWithSDKWallet({
   networkId: string;
   nodeUrl: string;
   data: TrainingTxData;
-  sdkWallet: import('@aztec/aztec.js/wallet').Wallet | null;
-  sdkAccount: import('@aztec/aztec.js/account').AccountWithSecretKey | null;
+  sdkWallet: Wallet | null;
+  sdkAccount: AccountWithSecretKey | null;
 }): Promise<TrainingTxResult> {
   if (!sdkWallet || !sdkAccount) {
     return {
@@ -192,21 +206,7 @@ async function submitWithSDKWallet({
     };
   }
 
-  const [
-    { AztecAddress },
-    { Fr },
-    { TxStatus },
-    { SponsoredFeePaymentMethod },
-    { AVAILABLE_NETWORKS },
-    { ContractClass, ContractArtifact },
-  ] = await Promise.all([
-    import('@aztec/aztec.js/addresses'),
-    import('@aztec/aztec.js/fields'),
-    import('@aztec/stdlib/tx'),
-    import('@aztec/aztec.js/fee'),
-    import('../../config/networks'),
-    loadContractModules(arch),
-  ]);
+  const { ContractClass, ContractArtifact } = await loadContractModules(arch);
 
   const accountAddress = sdkAccount.getAddress();
 
@@ -214,19 +214,10 @@ async function submitWithSDKWallet({
   // For named networks the address comes from the network config;
   // for local-network it is computed from the canonical salt.
   const networkConfig = AVAILABLE_NETWORKS.find((n) => n.name === networkId);
-  let fpcAddress: import('@aztec/aztec.js/addresses').AztecAddress;
+  let fpcAddress: AztecAddress;
   if (networkConfig?.sponsoredFpcAddress) {
     fpcAddress = AztecAddress.fromString(networkConfig.sponsoredFpcAddress);
   } else {
-    const [
-      { getContractInstanceFromInstantiationParams },
-      { SponsoredFPCContractArtifact },
-      { SPONSORED_FPC_SALT },
-    ] = await Promise.all([
-      import('@aztec/aztec.js/contracts'),
-      import('@aztec/noir-contracts.js/SponsoredFPC'),
-      import('@aztec/constants'),
-    ]);
     const fpcInstance = await getContractInstanceFromInstantiationParams(
       SponsoredFPCContractArtifact,
       { salt: new Fr(SPONSORED_FPC_SALT) }
@@ -243,7 +234,6 @@ async function submitWithSDKWallet({
     sdkWallet as { getContractInstance: (a: unknown) => Promise<unknown> }
   ).getContractInstance(trainingAddress);
   if (!contractInstance) {
-    const { createAztecNodeClient } = await import('@aztec/aztec.js/node');
     const aztecNode = createAztecNodeClient(nodeUrl);
     contractInstance = await aztecNode.getContract(trainingAddress);
     if (contractInstance) {
@@ -346,23 +336,7 @@ async function submitWithEmbeddedWallet({
     };
   }
 
-  const [
-    { SharedPXEService },
-    { AztecAddress },
-    { Fr },
-    { AccountManager },
-    { EcdsaRAccountContract },
-    { TxStatus },
-    { ContractClass, ContractArtifact },
-  ] = await Promise.all([
-    import('../../aztec-wallet/services/aztec/pxe'),
-    import('@aztec/aztec.js/addresses'),
-    import('@aztec/aztec.js/fields'),
-    import('@aztec/aztec.js/wallet'),
-    import('@aztec/accounts/ecdsa/lazy'),
-    import('@aztec/stdlib/tx'),
-    loadContractModules(arch),
-  ]);
+  const { ContractClass, ContractArtifact } = await loadContractModules(arch);
 
   const pxeInstance = await SharedPXEService.getCurrentInstance(
     nodeUrl,

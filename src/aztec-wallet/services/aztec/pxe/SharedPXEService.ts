@@ -1,18 +1,23 @@
+import { EcdsaRAccountContract } from '@aztec/accounts/ecdsa/lazy';
 import { AztecAddress } from '@aztec/aztec.js/addresses';
+import { getContractInstanceFromInstantiationParams } from '@aztec/aztec.js/contracts';
 import { SponsoredFeePaymentMethod } from '@aztec/aztec.js/fee';
 import { Fr } from '@aztec/aztec.js/fields';
 import { createLogger } from '@aztec/aztec.js/log';
 import type { AztecNode } from '@aztec/aztec.js/node';
+import { AccountManager } from '@aztec/aztec.js/wallet';
 import { SPONSORED_FPC_SALT } from '@aztec/constants';
 import { createStore } from '@aztec/kv-store/indexeddb';
 import { SponsoredFPCContractArtifact } from '@aztec/noir-contracts.js/SponsoredFPC';
 import { createPXE } from '@aztec/pxe/client/bundle';
 import { getPXEConfig } from '@aztec/pxe/config';
 import type { PXE } from '@aztec/pxe/server';
+import { getDeploymentConfig } from '../../../../config/contracts';
 import { AVAILABLE_NETWORKS } from '../../../../config/networks';
 import { FeePaymentRegister } from '../../../../services/aztec/feePayment/FeePaymentRegister';
 import { ZKMLContractRegister } from '../../../../services/aztec/zkml/ZKMLContractRegister';
 import { MinimalWallet } from '../../../../utils/MinimalWallet';
+import { getSavedAccount } from '../../../services/wallet/embeddedAccount';
 import { NetworkService } from '../network';
 import { AztecStorageService } from '../storage';
 import type { AztecNetwork } from '../../../../config/networks/constants';
@@ -348,9 +353,6 @@ class SharedPXEServiceClass {
       return instance;
     }
 
-    const { getContractInstanceFromInstantiationParams } = await import(
-      '@aztec/aztec.js/contracts'
-    );
     return await getContractInstanceFromInstantiationParams(
       SponsoredFPCContractArtifact,
       { salt: new Fr(SPONSORED_FPC_SALT) }
@@ -390,9 +392,6 @@ class SharedPXEServiceClass {
     networkName: AztecNetwork
   ): Promise<void> {
     try {
-      const { getDeploymentConfig } = await import(
-        '../../../../config/contracts'
-      );
       const config = getDeploymentConfig(networkName);
 
       const candidates: {
@@ -485,9 +484,6 @@ class SharedPXEServiceClass {
 
     const work = async () => {
       try {
-        const { getSavedAccount } = await import(
-          '../../../services/wallet/embeddedAccount'
-        );
         const saved = getSavedAccount();
         // Guard against null or malformed credentials (e.g. empty object `{}`
         // stored when a previous account-creation attempt was interrupted).
@@ -511,12 +507,6 @@ class SharedPXEServiceClass {
         ) {
           return;
         }
-
-        const { AccountManager } = await import('@aztec/aztec.js/wallet');
-        const { EcdsaRAccountContract } = await import(
-          '@aztec/accounts/ecdsa/lazy'
-        );
-        const { Fr } = await import('@aztec/aztec.js/fields');
 
         const secretKey = Fr.fromString(saved.secretKey);
         const salt = Fr.fromString(saved.salt);
