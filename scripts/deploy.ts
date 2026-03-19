@@ -78,7 +78,7 @@ async function deployToNetwork(networkId: string): Promise<void> {
 
   // Signerless wallet: handles AztecAddress.ZERO via SignerlessAccount
   const { MinimalWallet } = await import('../src/utils/MinimalWallet.js');
-  const deployWallet = new MinimalWallet(pxe as any, aztecNode);
+  const deployWallet = new MinimalWallet(pxe, aztecNode);
 
   // SponsoredFPC is pre-deployed at genesis on both local-network and devnet.
   // Register the artifact so the PXE can resolve its function selectors during simulation.
@@ -87,7 +87,7 @@ async function deployToNetwork(networkId: string): Promise<void> {
     { salt: new Fr(SPONSORED_FPC_SALT) }
   );
 
-  await (pxe as any).registerContract({
+  await pxe.registerContract({
     instance: sponsoredFPCInstance,
     artifact: SponsoredFPCContractArtifact,
   });
@@ -123,8 +123,8 @@ async function deployToNetwork(networkId: string): Promise<void> {
     const slBiases = getSingleLayerBiases();
     const slPackedWeights = packToFields(slWeights, 23, 28);
     const slPackedBiases = packToFields(slBiases, 1, 10);
-    const singleLayer = await SingleLayerContract.deployWithOpts(
-      { method: 'constructor_pretrained', wallet: deployWallet as any },
+    const { contract: singleLayer } = await SingleLayerContract.deployWithOpts(
+      { method: 'constructor_pretrained', wallet: deployWallet },
       slPackedWeights,
       slPackedBiases
     ).send(sendOpts);
@@ -144,8 +144,8 @@ async function deployToNetwork(networkId: string): Promise<void> {
     const mlpBiases = getMLPBiases();
     const mlpPackedWeights = packToFields(mlpWeights, 43, 28);
     const mlpPackedBiases = packToFields(mlpBiases, 1, 26);
-    const mlp = await MultiLayerPerceptronContract.deployWithOpts(
-      { method: 'constructor_pretrained', wallet: deployWallet as any },
+    const { contract: mlp } = await MultiLayerPerceptronContract.deployWithOpts(
+      { method: 'constructor_pretrained', wallet: deployWallet },
       mlpPackedWeights,
       mlpPackedBiases
     ).send(sendOpts);
@@ -170,8 +170,8 @@ async function deployToNetwork(networkId: string): Promise<void> {
     const cnnBiases = getCNNBiases();
     const cnnPackedWeights = packToFields(cnnWeights, 3, 28);
     const cnnPackedBiases = packToFields(cnnBiases, 1, 28);
-    const cnn = await CNNGAPContract.deployWithOpts(
-      { method: 'constructor_pretrained', wallet: deployWallet as any },
+    const { contract: cnn } = await CNNGAPContract.deployWithOpts(
+      { method: 'constructor_pretrained', wallet: deployWallet },
       cnnPackedWeights,
       cnnPackedBiases
     ).send(sendOpts);
