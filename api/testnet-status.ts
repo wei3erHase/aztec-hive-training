@@ -9,8 +9,14 @@ export default async function handler(
   const upstream = await fetch(TARGET, { method: 'GET' });
 
   res.statusCode = upstream.status;
+
+  const STRIP_HEADERS = new Set([
+    'transfer-encoding',
+    'content-encoding',
+    'content-length',
+  ]);
   upstream.headers.forEach((value, key) => {
-    if (key.toLowerCase() !== 'transfer-encoding') {
+    if (!STRIP_HEADERS.has(key.toLowerCase())) {
       res.setHeader(key, value);
     }
   });

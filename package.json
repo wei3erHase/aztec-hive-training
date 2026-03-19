@@ -35,7 +35,7 @@
     "test:e2e": "yarn prep-test && yarn playwright test --project=chromium",
     "test:e2e:local-network": "yarn playwright test --config=playwright.local-network.config.ts",
     "lint": "eslint src && prettier --check ./src ./scripts ./tests",
-    "lint:fix": "eslint src --fix && prettier --write ./src ./scripts ./tests",
+    "lint:fix": "eslint src --fix && prettier --write ./api ./src ./scripts ./tests",
     "prepare": "husky"
   },
   "dependencies": {

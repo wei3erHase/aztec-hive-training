@@ -34,8 +34,14 @@ export default async function handler(
   });
 
   res.statusCode = upstream.status;
+
+  const STRIP_HEADERS = new Set([
+    'transfer-encoding',
+    'content-encoding', // Node fetch auto-decompresses; re-sending this header causes ERR_CONTENT_DECODING_FAILED
+    'content-length', // Byte length changes after decompression
+  ]);
   upstream.headers.forEach((value, key) => {
-    if (key.toLowerCase() !== 'transfer-encoding') {
+    if (!STRIP_HEADERS.has(key.toLowerCase())) {
       res.setHeader(key, value);
     }
   });
