@@ -1,13 +1,17 @@
 import { create } from 'zustand';
 import type { AccountWithSecretKey } from '@aztec/aztec.js/account';
 import { AztecAddress } from '@aztec/aztec.js/addresses';
-import type { AppCapabilities, GrantedAccountsCapability, Wallet } from '@aztec/aztec.js/wallet';
+import type {
+  AppCapabilities,
+  GrantedAccountsCapability,
+  Wallet,
+} from '@aztec/aztec.js/wallet';
 import type { WalletProvider } from '@aztec/wallet-sdk/manager';
+import { getDeploymentConfig } from '../../../config/contracts';
 import { WALLET_SDK_CONNECTOR_ID } from '../../connectors/WalletSDKConnector';
 import { NetworkService } from '../../services/aztec/network';
 import { WalletType } from '../../types/aztec';
 import { getNetworkStore } from '../network';
-import { getDeploymentConfig } from '../../../config/contracts';
 import { createEmbeddedActions } from './actions/embedded';
 import { isValidPXETransition } from './types';
 import type { WalletStore, WalletState } from './types';
