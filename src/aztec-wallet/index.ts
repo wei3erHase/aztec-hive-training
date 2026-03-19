@@ -15,7 +15,7 @@
  * } from './aztec-wallet';
  *
  * const config = createAztecWalletConfig({
- *   networks: [{ name: 'devnet', nodeUrl: 'https://devnet.aztec.network' }],
+ *   networks: [{ name: 'testnet', nodeUrl: 'https://rpc.testnet.aztec-labs.com/' }],
  *   showNetworkPicker: 'full',
  *   walletGroups: {
  *     embedded: true,
@@ -83,7 +83,7 @@ export {
  * @example
  * ```ts
  * const config = createAztecWalletConfig({
- *   networks: [{ name: 'devnet', nodeUrl: 'https://devnet.aztec.network' }],
+ *   networks: [{ name: 'testnet', nodeUrl: 'https://rpc.testnet.aztec-labs.com/' }],
  *   walletGroups: {
  *     embedded: true,
  *     evmWallets: ['metamask'],
@@ -209,16 +209,16 @@ export { isEmbeddedConnector } from '../types/walletConnector';
 export { isExternalSignerConnector } from '../types/walletConnector';
 
 /**
- * Type guard to check if a connector is a browser wallet connector (Azguard).
+ * Type guard to check if a connector is a Wallet SDK connector.
  *
  * @example
  * ```ts
- * if (isBrowserWalletConnector(connector)) {
- *   const caipAccount = connector.getCaipAccount();
+ * if (isWalletSDKConnector(connector)) {
+ *   const wallet = connector.getSDKWallet();
  * }
  * ```
  */
-export { isBrowserWalletConnector } from '../types/walletConnector';
+export { isWalletSDKConnector } from '../types/walletConnector';
 
 /**
  * Type guard to check if a connector has app-managed PXE.

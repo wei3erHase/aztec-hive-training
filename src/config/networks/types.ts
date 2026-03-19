@@ -32,6 +32,8 @@ export interface NetworkConfig {
   tokenDeploymentSalt: string;
   proverEnabled: boolean;
   isTestnet: boolean;
+  /** Address of the SponsoredFPC contract on this network. When set, the instance is fetched from the node instead of computing from salt. Defaults to canonical salt (0) if omitted. */
+  sponsoredFpcAddress?: string;
   /** Fee payment contracts configuration (keyed by contract name, e.g., 'metered') */
   feePaymentContracts?: Record<string, DeployedContractConfig>;
   /** ZKML contract addresses for PXE registration (populated when deployed) */

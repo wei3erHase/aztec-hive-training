@@ -215,7 +215,7 @@ class SharedPXEServiceClass {
 
     // Register the SponsoredFPC artifact so the PXE can resolve its function
     // selectors during fee payment simulation (e.g. when deploying an account).
-    await this.registerSponsoredFPC(pxe);
+    await this.registerSponsoredFPC(pxe, aztecNode, networkName);
 
     // Register fee payment contracts (look up config by network name)
     const feePaymentConfig = this.getFeePaymentConfig(networkName);
@@ -226,6 +226,11 @@ class SharedPXEServiceClass {
     const zkmlConfig = this.getZKMLConfig(networkName);
     const zkmlRegister = new ZKMLContractRegister();
     await zkmlRegister.registerAll(pxe, zkmlConfig);
+
+    // Pre-register all deployed ZKML contracts with their artifacts so that
+    // the first predict() call does not need to do IndexedDB writes while the
+    // block-stream processor is also writing (causing "transaction not active").
+    await this.preRegisterDeployedZKML(pxe, aztecNode, networkName);
 
     // Initialize storage service
     const storageService = new AztecStorageService();
@@ -242,7 +247,7 @@ class SharedPXEServiceClass {
       wallet,
       storageService,
       getSponsoredFeePaymentMethod: () =>
-        this.getSponsoredFeePaymentMethod(key, pxe),
+        this.getSponsoredFeePaymentMethod(key, aztecNode, networkName),
     };
 
     this.instances.set(key, {
@@ -301,8 +306,12 @@ class SharedPXEServiceClass {
     }
   }
 
-  private async registerSponsoredFPC(pxe: PXE): Promise<void> {
-    const instance = await this.getSponsoredPFCContract(pxe);
+  private async registerSponsoredFPC(
+    pxe: PXE,
+    aztecNode: AztecNode,
+    networkName: AztecNetwork
+  ): Promise<void> {
+    const instance = await this.getSponsoredPFCInstance(aztecNode, networkName);
     await pxe.registerContract({
       instance,
       artifact: SponsoredFPCContractArtifact,
@@ -310,36 +319,236 @@ class SharedPXEServiceClass {
     logger.info(`Registered SponsoredFPC at ${instance.address}`);
   }
 
-  private async getSponsoredPFCContract(_pxe: PXE) {
+  /**
+   * Returns the SponsoredFPC contract instance.
+   *
+   * For networks that declare a `sponsoredFpcAddress`, the instance is fetched
+   * directly from the node — the salt never appears in client-side code.
+   * For local-network (no address configured), falls back to computing it from
+   * the canonical salt (0).
+   */
+  private async getSponsoredPFCInstance(
+    aztecNode: AztecNode,
+    networkName: AztecNetwork
+  ) {
+    const networkConfig = AVAILABLE_NETWORKS.find(
+      (n) => n.name === networkName
+    );
+
+    if (networkConfig?.sponsoredFpcAddress) {
+      const address = AztecAddress.fromString(
+        networkConfig.sponsoredFpcAddress
+      );
+      const instance = await aztecNode.getContract(address);
+      if (!instance) {
+        throw new Error(
+          `SponsoredFPC instance not found on node at ${networkConfig.sponsoredFpcAddress}`
+        );
+      }
+      return instance;
+    }
+
     const { getContractInstanceFromInstantiationParams } = await import(
       '@aztec/aztec.js/contracts'
     );
-
     return await getContractInstanceFromInstantiationParams(
       SponsoredFPCContractArtifact,
-      {
-        salt: new Fr(SPONSORED_FPC_SALT),
-      }
+      { salt: new Fr(SPONSORED_FPC_SALT) }
     );
   }
 
   private async getSponsoredFeePaymentMethod(
     key: string,
-    pxe: PXE
+    aztecNode: AztecNode,
+    networkName: AztecNetwork
   ): Promise<SponsoredFeePaymentMethod> {
     const cached = this.cachedPaymentMethods.get(key);
     if (cached) {
       return cached;
     }
 
-    const sponsoredPFCContract = await this.getSponsoredPFCContract(pxe);
-    const paymentMethod = new SponsoredFeePaymentMethod(
-      sponsoredPFCContract.address
-    );
+    const instance = await this.getSponsoredPFCInstance(aztecNode, networkName);
+    const paymentMethod = new SponsoredFeePaymentMethod(instance.address);
 
     this.cachedPaymentMethods.set(key, paymentMethod);
 
     return paymentMethod;
+  }
+
+  /**
+   * Pre-registers all deployed ZKML contracts with the PXE so that the first
+   * predict() call does not trigger IndexedDB writes that compete with the
+   * running block-stream processor (which would cause "transaction not active"
+   * errors and silent prediction hangs).
+   *
+   * Failures are non-fatal — a contract that is not deployed yet simply has no
+   * address and is skipped.
+   */
+  private async preRegisterDeployedZKML(
+    pxe: PXE,
+    aztecNode: AztecNode,
+    networkName: AztecNetwork
+  ): Promise<void> {
+    try {
+      const { getDeploymentConfig } = await import(
+        '../../../../config/contracts'
+      );
+      const config = getDeploymentConfig(networkName);
+
+      const candidates: {
+        key: keyof typeof config.contracts;
+        getArtifact: () => Promise<unknown>;
+      }[] = [
+        {
+          key: 'singleLayer',
+          getArtifact: async () =>
+            (await import('../../../../artifacts/SingleLayer'))
+              .SingleLayerContractArtifact,
+        },
+        {
+          key: 'multiLayerPerceptron',
+          getArtifact: async () =>
+            (await import('../../../../artifacts/MultiLayerPerceptron'))
+              .MultiLayerPerceptronContractArtifact,
+        },
+        {
+          key: 'cnnGap',
+          getArtifact: async () =>
+            (await import('../../../../artifacts/CNNGAP'))
+              .CNNGAPContractArtifact,
+        },
+      ];
+
+      for (const { key, getArtifact } of candidates) {
+        const contractAddress = config.contracts[key]?.address;
+        if (!contractAddress) continue;
+
+        try {
+          const address = AztecAddress.fromString(contractAddress);
+          let instance = await pxe.getContractInstance(address);
+          if (!instance) {
+            instance = await aztecNode.getContract(address);
+          }
+          if (!instance) continue;
+
+          const artifact = await getArtifact();
+          await pxe.registerContract({
+            instance,
+            artifact: artifact as Parameters<
+              typeof pxe.registerContract
+            >[0]['artifact'],
+          });
+          logger.info(
+            `Pre-registered ZKML contract ${key} at ${contractAddress}`
+          );
+        } catch (err) {
+          logger.warn(`Failed to pre-register ZKML contract ${key}:`, err);
+        }
+      }
+    } catch (err) {
+      logger.warn('Failed to pre-register ZKML contracts:', err);
+    }
+  }
+
+  /**
+   * Pre-registers the saved embedded account (from localStorage) with the PXE
+   * during PXE initialisation, before the auto-connect flow fires.
+   *
+   * The block stream starts as soon as the PXE is created. The signing-key note
+   * for the embedded account is emitted at block N (the account-deployment block).
+   * If the auto-connect flow calls wallet.registerContract() while the block
+   * stream is trying to write the anchor-block header (also an IDB write), the
+   * browser's IDB "transaction not active" rule kills the block-stream write,
+   * leaving the anchor stuck at genesis. That prevents fetchTaggedLogs from
+   * ever finding the signing-key note, causing private transactions (training)
+   * to fail with "Failed to get a note 'self.is_some()'".
+   *
+   * By registering here — in the same init batch as ZKML pre-registration — we
+   * ensure the IDB write completes during the very first blocks of the sync
+   * (blocks 0 … N-1), so by the time the stream reaches block N there is
+   * nothing else contending for IDB write access.
+   */
+  private async preRegisterSavedAccount(wallet: MinimalWallet): Promise<void> {
+    if (typeof window === 'undefined') return; // localStorage not available in Node.js
+
+    // Wrap in a timeout so a hang in WASM/crypto initialisation never blocks
+    // initializeInstance (which would make ALL subsequent predict() calls hang).
+    const TIMEOUT_MS = 20_000;
+    const timeout = new Promise<void>((resolve) =>
+      setTimeout(() => {
+        logger.warn(
+          'preRegisterSavedAccount: timed out after 20s; auto-connect will register the account'
+        );
+        resolve();
+      }, TIMEOUT_MS)
+    );
+
+    const work = async () => {
+      try {
+        const { getSavedAccount } = await import(
+          '../../../services/wallet/embeddedAccount'
+        );
+        const saved = getSavedAccount();
+        // Guard against null or malformed credentials (e.g. empty object `{}`
+        // stored when a previous account-creation attempt was interrupted).
+        if (
+          !saved ||
+          !saved.secretKey ||
+          !saved.signingKey ||
+          !saved.salt ||
+          !saved.address
+        ) {
+          return;
+        }
+
+        // Skip if already in the wallet (e.g. called again after hot-reload)
+        const existingAccounts = await wallet.getAccounts();
+        if (
+          existingAccounts.some((a) => {
+            const addr = (a.item as { toString: () => string }).toString();
+            return addr === saved.address;
+          })
+        ) {
+          return;
+        }
+
+        const { AccountManager } = await import('@aztec/aztec.js/wallet');
+        const { EcdsaRAccountContract } = await import(
+          '@aztec/accounts/ecdsa/lazy'
+        );
+        const { Fr } = await import('@aztec/aztec.js/fields');
+
+        const secretKey = Fr.fromString(saved.secretKey);
+        const salt = Fr.fromString(saved.salt);
+        const signingKey = Buffer.from(saved.signingKey, 'hex');
+        const accountContract = new EcdsaRAccountContract(signingKey);
+        const accountManager = await AccountManager.create(
+          wallet,
+          secretKey,
+          accountContract,
+          salt
+        );
+        const account = await accountManager.getAccount();
+        const instance = accountManager.getInstance();
+        const artifact = await accountManager
+          .getAccountContract()
+          .getContractArtifact();
+        await wallet.registerContract(
+          instance,
+          artifact,
+          accountManager.getSecretKey()
+        );
+        wallet.addAccount(account);
+        logger.info(
+          `Pre-registered saved account at ${accountManager.address.toString()}`
+        );
+      } catch (err) {
+        // Non-fatal: the auto-connect flow will register the account anyway
+        logger.warn('Failed to pre-register saved account:', err);
+      }
+    };
+
+    await Promise.race([work(), timeout]);
   }
 
   private async registerSavedSenders(

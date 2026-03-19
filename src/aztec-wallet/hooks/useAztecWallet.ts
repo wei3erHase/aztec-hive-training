@@ -105,7 +105,7 @@ import type { StoreNetworkPreset } from '../types';
  *
  * return (
  *   <select value={networkName} onChange={(e) => switchNetwork(e.target.value)}>
- *     <option value="devnet">Devnet</option>
+ *     <option value="testnet">Testnet</option>
  *     <option value="local-network">Local Network</option>
  *   </select>
  * );
@@ -162,7 +162,6 @@ export function useAztecWallet() {
       connectEmbedded: state.connectEmbedded,
       connectExistingEmbedded: state.connectExistingEmbedded,
       hasSavedEmbeddedAccount: state.hasSavedEmbeddedAccount,
-      connectBrowserWallet: state.connectBrowserWallet,
       disconnect: state.disconnect,
       checkNetwork: state.checkNetwork,
     }))
@@ -185,10 +184,10 @@ export function useAztecWallet() {
   const address = walletState.account?.getAddress().toString() ?? null;
 
   // PXE initialization state (for Embedded/ExternalSigner)
-  // Browser wallets manage their own PXE, so they're considered initialized immediately
+  // Wallet-SDK wallets manage their own PXE, so they're considered initialized immediately
   const isPXEInitialized =
     walletState.pxeStatus === 'ready' ||
-    walletState.walletType === WalletType.BROWSER_WALLET;
+    walletState.walletType === WalletType.WALLET_SDK;
 
   // Check if there's a saved embedded account
   const hasSavedAccount = walletActions.hasSavedEmbeddedAccount();
@@ -241,7 +240,9 @@ export function useAztecWallet() {
             }
             break;
 
-          case WalletType.BROWSER_WALLET:
+          case WalletType.WALLET_SDK:
+            // Wallet SDK connections are driven by the modal UI (discovery + verification)
+            // This path is not normally reached via this hook
             await walletActions.connect(connectorId);
             break;
 

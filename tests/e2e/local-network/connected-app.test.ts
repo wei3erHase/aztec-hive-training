@@ -49,58 +49,33 @@ async function drawAndPredict(page: Page, architectureTestId: string) {
   const canvas = page.locator('[data-testid="canvas-panel"] canvas').first();
   await expect(canvas).toBeVisible();
 
-  const box = await canvas.boundingBox();
-  expect(box).not.toBeNull();
-  if (!box) {
-    throw new Error('Canvas bounding box is null');
-  }
-
   const drawStroke = async () => {
-    const cx = box.x + box.width * 0.5;
-    const cy = box.y + box.height * 0.5;
-    const points = [
-      { x: cx - 55, y: cy - 40 },
-      { x: cx - 25, y: cy - 65 },
-      { x: cx + 20, y: cy - 20 },
-      { x: cx - 10, y: cy + 25 },
-      { x: cx + 35, y: cy + 45 },
-      { x: cx + 55, y: cy + 5 },
+    // Scroll the canvas into the viewport and get a fresh bounding box each time.
+    // The canvas may not be in the visible area on the first attempt (page renders
+    // below the fold), so we can't rely on a box computed before the first draw.
+    await canvas.scrollIntoViewIfNeeded();
+    const box = await canvas.boundingBox();
+    if (!box) throw new Error('Canvas bounding box is null');
+
+    // Use canvas.hover() to move the cursor onto the canvas via Playwright's
+    // locator-aware action (handles any remaining scroll offset automatically).
+    // Then use page.mouse for the full drag gesture. Each `await` between
+    // mousedown and mouseup lets React commit isDrawing=true before stopDrawing
+    // runs, which is required for onDraw to fire.
+    const hw = box.width * 0.5;
+    const hh = box.height * 0.5;
+    const offsets = [
+      { x: -40, y: -30 },
+      { x: -10, y: -50 },
+      { x: +30, y: -10 },
+      { x: 0, y: +25 },
+      { x: +40, y: +40 },
     ];
 
-    // Prefer synthetic events (more deterministic in CI/headless); fallback to native mouse.
-    await canvas.evaluate((el, localPoints) => {
-      const fire = (type: string, x: number, y: number, buttons: number) => {
-        const event = new MouseEvent(type, {
-          bubbles: true,
-          cancelable: true,
-          clientX: x,
-          clientY: y,
-          buttons,
-        });
-        el.dispatchEvent(event);
-      };
-
-      const first = localPoints[0];
-      fire('mousedown', first.x, first.y, 1);
-      for (let i = 1; i < localPoints.length; i++) {
-        const p = localPoints[i];
-        fire('mousemove', p.x, p.y, 1);
-      }
-      const last = localPoints[localPoints.length - 1];
-      fire('mouseup', last.x, last.y, 0);
-    }, points);
-
-    const clearBtn = page.locator('[data-testid="canvas-clear-button"]');
-    const hasClearBtn = await clearBtn
-      .first()
-      .isVisible()
-      .catch(() => false);
-    if (hasClearBtn) return;
-
-    await page.mouse.move(points[0].x, points[0].y);
+    await canvas.hover({ position: { x: hw - 40, y: hh - 30 } });
     await page.mouse.down();
-    for (let i = 1; i < points.length; i++) {
-      await page.mouse.move(points[i].x, points[i].y, { steps: 12 });
+    for (const { x, y } of offsets) {
+      await canvas.hover({ position: { x: hw + x, y: hh + y } });
     }
     await page.mouse.up();
   };
@@ -142,7 +117,9 @@ async function drawAndPredict(page: Page, architectureTestId: string) {
 
   for (let attempt = 1; attempt <= 3; attempt++) {
     await drawStroke();
-    const digit = await waitForPredictedDigit(20_000);
+    // 180s per attempt — the MLP Noir circuit takes ~140s on a typical machine.
+    // Keeping 3 attempts for robustness; total max wait ≤ 9 min (< 10 min timeout).
+    const digit = await waitForPredictedDigit(180_000);
     if (digit !== null) {
       await expect(
         page.locator(`[data-testid="prediction-cell-${digit}"]`)

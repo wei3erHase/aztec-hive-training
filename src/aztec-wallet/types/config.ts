@@ -14,7 +14,7 @@ export type IconType =
  * Network preset for AztecWallet configuration
  */
 export interface NetworkPreset {
-  /** Network identifier (e.g., 'devnet', 'local-network') */
+  /** Network identifier (e.g., 'testnet', 'local-network') */
   name: AztecNetwork;
   /** Display name for UI */
   displayName?: string;
@@ -43,6 +43,14 @@ export interface EmbeddedGroupConfig {
   label?: string;
   /** Whether this group is enabled (default: true) */
   enabled?: boolean;
+}
+
+/**
+ * Configuration for wallet-sdk group (discovers any SDK-compatible Aztec wallet)
+ */
+export interface WalletSDKGroupConfig {
+  /** Button label (default: "Aztec Wallet") */
+  label?: string;
 }
 
 /**
@@ -148,7 +156,15 @@ export interface WalletGroupsConfig {
   embedded?: EmbeddedGroupConfig | boolean;
 
   /**
-   * Aztec browser wallets configuration
+   * Wallet SDK group - discovers any Aztec extension wallet implementing the SDK protocol
+   * - `true` or `{}` = enabled with defaults
+   * - `false` = disabled
+   * - `{ label: '...' }` = custom label
+   */
+  walletSdk?: WalletSDKGroupConfig | boolean;
+
+  /**
+   * Aztec browser wallets configuration (legacy - prefer walletSdk)
    * - `['azguard']` = simple config with preset IDs
    * - `{ wallets: [...] }` = advanced config with custom wallets
    * - `false` = disabled
@@ -170,7 +186,7 @@ export interface WalletGroupsConfig {
  * @example Simple config (recommended)
  * ```ts
  * const config = createAztecWalletConfig({
- *   networks: [{ name: 'devnet', nodeUrl: 'https://devnet.aztec.network' }],
+ *   networks: [{ name: 'testnet', nodeUrl: 'https://rpc.testnet.aztec-labs.com/' }],
  *   walletGroups: {
  *     embedded: true,
  *     evmWallets: ['metamask', 'rabby'],
@@ -230,6 +246,7 @@ export interface ResolvedAztecWalletConfig
   extends Omit<AztecWalletConfig, 'walletGroups'> {
   walletGroups: {
     embedded: EmbeddedGroupConfig | false;
+    walletSdk: WalletSDKGroupConfig | false;
     aztecWallets: AztecWalletsGroupConfig | false;
     evmWallets: EVMWalletsGroupConfig | false;
   };

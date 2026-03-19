@@ -19,7 +19,9 @@ interface TrainingControlsProps {
   statusMessage: string;
   isSubmittingOnChain: boolean;
   trainingState: TrainingState;
+  isConnected: boolean;
   onSubmit: () => void;
+  onConnect: () => void;
 }
 
 export const TrainingControls: React.FC<TrainingControlsProps> = ({
@@ -29,7 +31,9 @@ export const TrainingControls: React.FC<TrainingControlsProps> = ({
   statusMessage,
   isSubmittingOnChain,
   trainingState,
+  isConnected,
   onSubmit,
+  onConnect,
 }) => {
   const isSubmitting = isSubmittingOnChain || trainStatus === 'submitting';
   const canSubmit = !!currentImage && selectedLabel !== null && !isSubmitting;
@@ -42,17 +46,29 @@ export const TrainingControls: React.FC<TrainingControlsProps> = ({
 
   return (
     <>
-      <Button
-        variant="signal"
-        size="lg"
-        className="w-full"
-        onClick={onSubmit}
-        data-testid="train-submit-button"
-        disabled={!canSubmit}
-        isLoading={isSubmitting}
-      >
-        {isSubmitting ? 'Submitting Training…' : 'Train On-Chain'}
-      </Button>
+      {!isConnected ? (
+        <Button
+          variant="signal"
+          size="lg"
+          className="w-full"
+          onClick={onConnect}
+          data-testid="train-connect-button"
+        >
+          Connect Wallet to Train
+        </Button>
+      ) : (
+        <Button
+          variant="signal"
+          size="lg"
+          className="w-full"
+          onClick={onSubmit}
+          data-testid="train-submit-button"
+          disabled={!canSubmit}
+          isLoading={isSubmitting}
+        >
+          {isSubmitting ? 'Submitting Training…' : 'Train On-Chain'}
+        </Button>
+      )}
 
       {trainingState.isTraining && (
         <div className="panel rounded-2xl p-4" data-testid="training-progress">

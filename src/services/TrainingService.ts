@@ -193,7 +193,7 @@ export class TrainingService {
 
   getNetworkInfo(): { id: string; name: string; nodeUrl: string } {
     const name =
-      this.networkId === 'local-network' ? 'Local Network' : 'Aztec Devnet';
+      this.networkId === 'local-network' ? 'Local Network' : 'Aztec Testnet';
     return {
       id: this.networkId,
       name,
@@ -223,7 +223,7 @@ export function getTrainingService(
     nodeUrl ||
     (targetNetworkId === 'local-network'
       ? 'http://localhost:8080'
-      : 'https://v4-devnet-2.aztec-labs.com');
+      : 'https://rpc.testnet.aztec-labs.com/');
 
   if (!instance || instanceNetworkId !== targetNetworkId) {
     instance = new TrainingService(targetNetworkId, targetNodeUrl);
@@ -251,7 +251,7 @@ export async function initializeTrainingService(
     nodeUrl ||
     (targetNetworkId === 'local-network'
       ? 'http://localhost:8080'
-      : 'https://v4-devnet-2.aztec-labs.com');
+      : 'https://rpc.testnet.aztec-labs.com/');
 
   if (!instance || instanceNetworkId !== targetNetworkId) {
     instance = new TrainingService(targetNetworkId, targetNodeUrl);

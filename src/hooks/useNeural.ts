@@ -3,13 +3,11 @@ import { AztecAddress } from '@aztec/aztec.js/addresses';
 import { Fr } from '@aztec/aztec.js/fields';
 import { useAztecWallet } from '../aztec-wallet/hooks/useAztecWallet';
 import { SharedPXEService } from '../aztec-wallet/services/aztec/pxe';
-import { getSavedAccount } from '../aztec-wallet/services/wallet/embeddedAccount';
 import {
   getDeploymentConfig,
   getContractKeyForArchitecture,
   type ArchitectureId,
 } from '../config/contracts';
-import { hasAppManagedPXE } from '../types/walletConnector';
 import {
   SCALING_FACTOR,
   fieldToSigned,
@@ -55,6 +53,20 @@ export interface NeuralState {
   architecture: ArchitectureId;
 }
 
+interface CachedSetup {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  contract: any;
+  callerAddress: AztecAddress;
+}
+
+// Keyed by `${networkId}:${arch}:${contractAddress}`.
+// `contractSetupCache` stores completed setups; `contractSetupInFlight`
+// stores in-progress promises so concurrent callers wait on the same work
+// instead of racing to write to IndexedDB simultaneously (which causes
+// "IDBTransaction not active" errors and silent prediction hangs).
+const contractSetupCache = new Map<string, CachedSetup>();
+const contractSetupInFlight = new Map<string, Promise<CachedSetup>>();
+
 async function getContractClass(arch: ArchitectureId) {
   switch (arch) {
     case 'singleLayer':
@@ -86,56 +98,73 @@ async function setupContract(
   nodeUrl: string,
   networkId: string
 ) {
+  const cacheKey = `${networkId}:${arch}:${contractAddress}`;
+  const cached = contractSetupCache.get(cacheKey);
+  if (cached) return cached;
+
+  // If another call is already setting up the same contract, wait for it
+  // rather than racing to perform concurrent IndexedDB writes.
+  const inFlight = contractSetupInFlight.get(cacheKey);
+  if (inFlight) return inFlight;
+
+  const setupPromise = (async () => {
+    try {
+      return await doSetupContract(
+        arch,
+        contractAddress,
+        nodeUrl,
+        networkId,
+        cacheKey
+      );
+    } finally {
+      contractSetupInFlight.delete(cacheKey);
+    }
+  })();
+  contractSetupInFlight.set(cacheKey, setupPromise);
+  return setupPromise;
+}
+
+async function doSetupContract(
+  arch: ArchitectureId,
+  contractAddress: string,
+  nodeUrl: string,
+  networkId: string,
+  cacheKey: string
+) {
   const pxeInstance = await SharedPXEService.getCurrentInstance(
     nodeUrl,
-    networkId as 'local-network' | 'devnet'
+    networkId as 'local-network' | 'testnet'
   );
   const { pxe, wallet } = pxeInstance;
 
-  const saved = getSavedAccount();
-  if (!saved)
-    throw new Error(
-      'Wallet credentials not found. Please reconnect your wallet.'
-    );
-
-  const { AccountManager } = await import('@aztec/aztec.js/wallet');
-  const { EcdsaRAccountContract } = await import('@aztec/accounts/ecdsa/lazy');
-  const secretKey = Fr.fromString(saved.secretKey);
-  const salt = Fr.fromString(saved.salt);
-  const signingKey = Buffer.from(saved.signingKey, 'hex');
-  const accountContract = new EcdsaRAccountContract(signingKey);
-  const accountManager = await AccountManager.create(
-    wallet,
-    secretKey,
-    accountContract,
-    salt
-  );
-  const account = await accountManager.getAccount();
-  await wallet.registerContract(
-    accountManager.getInstance(),
-    await accountManager.getAccountContract().getContractArtifact(),
-    accountManager.getSecretKey()
-  );
-  wallet.addAccount(account);
+  // predict_all and shapley_for_class are unconstrained (public) functions.
+  // They do NOT access private state, so the caller identity is irrelevant.
+  // Using AztecAddress.ZERO avoids AccountManager.create (which lazily
+  // initialises the ECDSA account contract artifact and can hang on a cold
+  // browser context, blocking all predictions indefinitely).
+  const callerAddress = AztecAddress.ZERO;
 
   const artifact = await getContractArtifact(arch);
   const address = AztecAddress.fromString(contractAddress);
   let contractInstance = await pxe.getContractInstance(address);
   if (!contractInstance) {
+    // Contract not yet registered — fetch from node and register once.
+    // Skipping when already registered avoids a redundant IndexedDB write
+    // that can race with the block-stream and cause TransactionInactiveError.
     contractInstance = await pxeInstance.aztecNode.getContract(address);
+    if (contractInstance && artifact) {
+      await wallet.registerContract(contractInstance, artifact);
+    }
   }
-  if (contractInstance && artifact) {
-    await wallet.registerContract(contractInstance, artifact);
-  }
-
-  const callerAddress = account.getAddress();
   const ContractClass = await getContractClass(arch);
   const contract = ContractClass.at(
     address,
     wallet as Parameters<typeof ContractClass.at>[1]
   );
 
-  return { contract, callerAddress };
+  const result: CachedSetup = { contract, callerAddress };
+  contractSetupCache.set(cacheKey, result);
+  return result;
 }
 
 function pixelsToFields(pixels: number[]): Fr[] {
@@ -195,7 +224,7 @@ function parseExplanationResult(result: unknown): {
 }
 
 export function useNeural(initialArchitecture: ArchitectureId = 'mlp') {
-  const { isConnected, network, connector } = useAztecWallet();
+  const { network } = useAztecWallet();
   const networkId = network?.name ?? 'local-network';
 
   const [state, setState] = useState<NeuralState>({
@@ -253,12 +282,6 @@ export function useNeural(initialArchitecture: ArchitectureId = 'mlp') {
           `${label} is not deployed for ${networkId}. Deploy with yarn deploy-contracts for the local network.`
         );
       }
-      if (!isConnected || !connector || !hasAppManagedPXE(connector)) {
-        throw new Error(
-          'Please connect your embedded wallet to make predictions'
-        );
-      }
-
       const nodeUrl = network?.nodeUrl ?? 'http://localhost:8080';
       const { contract, callerAddress } = await setupContract(
         arch,
@@ -269,7 +292,7 @@ export function useNeural(initialArchitecture: ArchitectureId = 'mlp') {
 
       const startTime = performance.now();
       const inputPixels = pixelsToFields(downscaleTo8x8(imageData.pixels));
-      const result = await contract.methods
+      const { result } = await contract.methods
         .predict_all(inputPixels)
         .simulate({ from: callerAddress });
 
@@ -288,7 +311,7 @@ export function useNeural(initialArchitecture: ArchitectureId = 'mlp') {
       }));
       return predictionResult;
     },
-    [state.architecture, networkId, isConnected, connector, network?.nodeUrl]
+    [state.architecture, networkId, network?.nodeUrl]
   );
 
   const explain = useCallback(
@@ -301,8 +324,6 @@ export function useNeural(initialArchitecture: ArchitectureId = 'mlp') {
       const contractAddress =
         getDeploymentConfig(networkId).contracts[contractKey].address;
       if (!contractAddress) return null;
-      if (!isConnected || !connector || !hasAppManagedPXE(connector))
-        return null;
 
       const nodeUrl = network?.nodeUrl ?? 'http://localhost:8080';
       const startTime = performance.now();
@@ -317,9 +338,9 @@ export function useNeural(initialArchitecture: ArchitectureId = 'mlp') {
 
       let rawResult: unknown;
       try {
-        rawResult = await contract.methods
+        ({ result: rawResult } = await contract.methods
           .shapley_for_class(inputPixels, new Fr(BigInt(targetClass)))
-          .simulate({ from: callerAddress });
+          .simulate({ from: callerAddress }));
       } catch (simError) {
         const errMsg =
           simError instanceof Error ? simError.message : String(simError);
@@ -379,7 +400,7 @@ export function useNeural(initialArchitecture: ArchitectureId = 'mlp') {
       }));
       return explanationResult;
     },
-    [state.architecture, networkId, isConnected, connector, network?.nodeUrl]
+    [state.architecture, networkId, network?.nodeUrl]
   );
 
   const prepareTrainingTx = useCallback(
@@ -406,7 +427,8 @@ export function useNeural(initialArchitecture: ArchitectureId = 'mlp') {
     []
   );
 
-  const canPredict = isConnected && connector && hasAppManagedPXE(connector);
+  // Predictions are unconstrained simulations — no wallet required.
+  const canPredict = true;
 
   const isArchitectureAvailable =
     !!getDeploymentConfig(networkId).contracts[

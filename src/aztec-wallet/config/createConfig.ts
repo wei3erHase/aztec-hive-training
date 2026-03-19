@@ -1,10 +1,11 @@
 import { isStringArray } from '../../utils';
-import { BrowserWalletConnector } from '../connectors/BrowserWalletConnector';
 import { createEmbeddedConnector } from '../connectors/EmbeddedConnector';
+import { createWalletSDKConnector } from '../connectors/WalletSDKConnector';
 import {
   DEFAULT_LABELS,
   DEFAULT_MODAL_CONFIG,
   DEFAULT_EMBEDDED_CONFIG,
+  DEFAULT_WALLET_SDK_CONFIG,
 } from './defaults';
 import { getAztecWalletPreset, AZTEC_WALLET_PRESETS } from './walletPresets';
 import type { ConnectorFactory } from '../connectors/registry';
@@ -13,6 +14,7 @@ import type {
   AztecBrowserWalletConfig,
   AztecWalletsGroupConfig,
   EmbeddedGroupConfig,
+  WalletSDKGroupConfig,
   EVMWalletsGroupConfig,
   ResolvedAztecWalletConfig,
 } from '../types';
@@ -64,6 +66,7 @@ function resolveAztecWallets(ids: string[]): AztecBrowserWalletConfig[] {
  */
 function createConnectorsFromWalletGroups(walletGroups: {
   embedded: EmbeddedGroupConfig | false;
+  walletSdk: WalletSDKGroupConfig | false;
   aztecWallets: AztecWalletsGroupConfig | false;
   evmWallets: EVMWalletsGroupConfig | false;
 }): ConnectorFactory[] {
@@ -74,22 +77,12 @@ function createConnectorsFromWalletGroups(walletGroups: {
     connectors.push(createEmbeddedConnector);
   }
 
-  // Add Aztec browser wallet connectors
-  if (walletGroups.aztecWallets !== false) {
-    for (const wallet of walletGroups.aztecWallets.wallets) {
-      const preset = AZTEC_WALLET_PRESETS[wallet.id];
-      if (preset) {
-        connectors.push(
-          () =>
-            new BrowserWalletConnector({
-              id: wallet.id,
-              label: wallet.name,
-              adapterFactory: preset.getAdapter,
-            })
-        );
-      }
-    }
+  // Add wallet-sdk connector
+  if (walletGroups.walletSdk !== false) {
+    connectors.push(createWalletSDKConnector);
   }
+
+  // Legacy aztecWallets group is kept for backward compatibility but unused
 
   return connectors;
 }
@@ -97,33 +90,16 @@ function createConnectorsFromWalletGroups(walletGroups: {
 /**
  * Create an AztecWallet configuration with defaults applied
  *
- * Supports both simple and advanced configuration formats.
- *
  * @param config - User configuration
  * @returns Resolved configuration with all defaults applied
  *
  * @example Simple config (recommended)
  * ```ts
  * const config = createAztecWalletConfig({
- *   networks: [{ name: 'devnet', nodeUrl: '...' }],
+ *   networks: [{ name: 'testnet', nodeUrl: '...' }],
  *   walletGroups: {
  *     embedded: true,
- *     evmWallets: ['metamask', 'rabby'],
- *     aztecWallets: ['azguard'],
- *   },
- * });
- * ```
- *
- * @example Advanced config (custom wallets)
- * ```ts
- * const config = createAztecWalletConfig({
- *   networks: [{ name: 'devnet', nodeUrl: '...' }],
- *   walletGroups: {
- *     embedded: { label: 'Create Account' },
- *     evmWallets: {
- *       label: 'Connect EVM',
- *       wallets: [{ id: 'custom', name: 'Custom', icon: '...', rdns: '...' }],
- *     },
+ *     walletSdk: true,
  *   },
  * });
  * ```
@@ -134,7 +110,6 @@ export function createAztecWalletConfig(
   const { walletGroups } = config;
 
   // Resolve embedded config
-  // Accepts: true, false, or { label?: string, enabled?: boolean }
   let resolvedEmbedded: ResolvedAztecWalletConfig['walletGroups']['embedded'];
   if (walletGroups.embedded === false) {
     resolvedEmbedded = false;
@@ -147,20 +122,30 @@ export function createAztecWalletConfig(
     };
   }
 
-  // Resolve Aztec wallets config
-  // Accepts: false, ['azguard'], or { label?: string, wallets: [...] }
+  // Resolve wallet-sdk config
+  let resolvedWalletSdk: WalletSDKGroupConfig | false;
+  if (walletGroups.walletSdk === false) {
+    resolvedWalletSdk = false;
+  } else if (walletGroups.walletSdk === true || !walletGroups.walletSdk) {
+    resolvedWalletSdk = { ...DEFAULT_WALLET_SDK_CONFIG };
+  } else {
+    resolvedWalletSdk = {
+      ...DEFAULT_WALLET_SDK_CONFIG,
+      ...(walletGroups.walletSdk as WalletSDKGroupConfig),
+    };
+  }
+
+  // Resolve legacy Aztec wallets config
   let resolvedAztecWallets: AztecWalletsGroupConfig | false;
   if (walletGroups.aztecWallets === false || !walletGroups.aztecWallets) {
     resolvedAztecWallets = false;
   } else if (isStringArray(walletGroups.aztecWallets)) {
-    // Simple config: ['azguard', 'obsidian']
     const wallets = resolveAztecWallets(walletGroups.aztecWallets);
     resolvedAztecWallets =
       wallets.length > 0
         ? { label: DEFAULT_LABELS.aztecWallets, wallets }
         : false;
   } else if (isFullGroupConfig(walletGroups.aztecWallets)) {
-    // Full config: { label: '...', wallets: [...] }
     resolvedAztecWallets = {
       label: walletGroups.aztecWallets.label ?? DEFAULT_LABELS.aztecWallets,
       wallets: walletGroups.aztecWallets.wallets,
@@ -174,11 +159,11 @@ export function createAztecWalletConfig(
 
   const resolvedWalletGroups: ResolvedAztecWalletConfig['walletGroups'] = {
     embedded: resolvedEmbedded,
+    walletSdk: resolvedWalletSdk,
     aztecWallets: resolvedAztecWallets,
     evmWallets: resolvedEvmWallets,
   };
 
-  // Auto-create connectors from wallet groups
   const connectors = createConnectorsFromWalletGroups(resolvedWalletGroups);
 
   return {

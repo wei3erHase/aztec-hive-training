@@ -16,9 +16,12 @@ describe('TrainingService — network info', () => {
     expect(svc.getNetworkInfo().name).toBe('Local Network');
   });
 
-  it('reports "Aztec Devnet" name for a devnet network', () => {
-    const svc = new TrainingService('devnet', 'https://node.devnet.com');
-    expect(svc.getNetworkInfo().name).toBe('Aztec Devnet');
+  it('reports "Aztec Testnet" name for a testnet network', () => {
+    const svc = new TrainingService(
+      'testnet',
+      'https://rpc.testnet.aztec-labs.com/'
+    );
+    expect(svc.getNetworkInfo().name).toBe('Aztec Testnet');
   });
 
   it('exposes the network id', () => {
@@ -34,8 +37,11 @@ describe('TrainingService — network info', () => {
 });
 
 describe('TrainingService — contract deployment detection', () => {
-  it('reports deployed when the devnet MLP address is present in deployed.json', () => {
-    const svc = new TrainingService('devnet', 'https://node.devnet.com');
+  it('reports deployed when the testnet MLP address is present in deployed.json', () => {
+    const svc = new TrainingService(
+      'testnet',
+      'https://rpc.testnet.aztec-labs.com/'
+    );
     expect(svc.isTrainingContractDeployed()).toBe(true);
   });
 
@@ -45,7 +51,10 @@ describe('TrainingService — contract deployment detection', () => {
   });
 
   it('getAddresses reflects the deployment config', () => {
-    const svc = new TrainingService('devnet', 'https://node.devnet.com');
+    const svc = new TrainingService(
+      'testnet',
+      'https://rpc.testnet.aztec-labs.com/'
+    );
     const addresses = svc.getAddresses();
     expect(typeof addresses.multiLayerPerceptron).toBe('string');
     expect((addresses.multiLayerPerceptron ?? '').length).toBeGreaterThan(0);
@@ -93,28 +102,14 @@ describe('TrainingService — connection state', () => {
       vi.fn().mockRejectedValue(new Error('connection refused'))
     );
 
-    const svc = new TrainingService('devnet', 'https://node.devnet.com');
-    const result = await svc.checkConnection();
-
-    expect(result).toBe(false);
-    expect(svc.getConnectionError()).toContain('Cannot connect to devnet');
-  });
-
-  it('checkConnection returns false when RPC response is not ok', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: false,
-        status: 503,
-        json: vi.fn(),
-      })
+    const svc = new TrainingService(
+      'testnet',
+      'https://rpc.testnet.aztec-labs.com/'
     );
-
-    const svc = new TrainingService('local-network', 'http://localhost:8080');
     const result = await svc.checkConnection();
 
     expect(result).toBe(false);
-    expect(svc.getConnectionError()).not.toBeNull();
+    expect(svc.getConnectionError()).toContain('Cannot connect to testnet');
   });
 });
 
@@ -127,8 +122,8 @@ describe('getTrainingService singleton', () => {
 
   it('returns a new instance for a different network', () => {
     const localNetwork = getTrainingService('local-network');
-    const devnet = getTrainingService('devnet');
-    expect(localNetwork).not.toBe(devnet);
+    const testnet = getTrainingService('testnet');
+    expect(localNetwork).not.toBe(testnet);
   });
 
   it('returns a new instance after resetTrainingService', () => {

@@ -1,6 +1,6 @@
 import type { AccountWithSecretKey } from '@aztec/aztec.js/account';
-import type { AztecNetwork } from '../../../config/networks/constants';
-import type { IBrowserWalletAdapter } from '../../../types/browserWallet';
+import type { Wallet } from '@aztec/aztec.js/wallet';
+import type { WalletProvider } from '@aztec/wallet-sdk/manager';
 import type {
   ConnectionStatus,
   WalletConnector,
@@ -54,11 +54,8 @@ export type WalletState = {
   signerType: ExternalSignerType | null;
   connectedRdns: string | null;
 
-  // BrowserWallet-specific (only read when walletType === BROWSER_WALLET)
-  caipAccount: string | null;
-  caipAccounts: string[];
-  supportedChains: string[];
-  isInstalled: boolean;
+  // WalletSDK-specific (only set when walletType === WALLET_SDK)
+  sdkWallet: Wallet | null;
 
   // Connector management
   connectors: WalletConnector[];
@@ -85,24 +82,12 @@ export type WalletActions = {
   ) => Promise<AccountWithSecretKey | null>;
   hasSavedEmbeddedAccount: () => boolean;
 
-  // Browser Wallet
-  connectBrowserWallet: (
-    adapter: IBrowserWalletAdapter,
-    networkName: AztecNetwork,
-    connectorId: WalletConnectorId
-  ) => Promise<void>;
-  setBrowserWalletState: (
-    state: Partial<
-      Pick<
-        WalletState,
-        | 'account'
-        | 'caipAccount'
-        | 'caipAccounts'
-        | 'supportedChains'
-        | 'isInstalled'
-      >
-    >
-  ) => void;
+  // Wallet SDK
+  connectWalletSDK: (
+    wallet: Wallet,
+    provider: WalletProvider,
+    connectorId?: WalletConnectorId
+  ) => Promise<AccountWithSecretKey>;
 
   // Shared
   disconnect: (cleanup?: () => Promise<void> | void) => Promise<void>;

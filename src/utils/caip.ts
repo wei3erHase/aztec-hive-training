@@ -1,5 +1,4 @@
 import { AztecAddress } from '@aztec/aztec.js/addresses';
-import type { CaipAccount } from '@azguardwallet/types';
 
 /**
  * Extracts the chain identifier from a CAIP account string.
@@ -8,9 +7,7 @@ import type { CaipAccount } from '@azguardwallet/types';
  * @param caipAccount - The full CAIP account string
  * @returns The chain identifier (e.g., "aztec:testnet")
  */
-export const getChainFromCaipAccount = (
-  caipAccount: CaipAccount | string
-): string => {
+export const getChainFromCaipAccount = (caipAccount: string): string => {
   const [namespace, chainId] = caipAccount.split(':');
   return `${namespace}:${chainId}`;
 };

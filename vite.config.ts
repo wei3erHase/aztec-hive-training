@@ -149,15 +149,15 @@ export default defineConfig(() => {
       changeOrigin: true,
       rewrite: () => '/status',
     },
-    '/api/devnet-status': {
-      target: 'https://v4-devnet-2.aztec-labs.com',
+    '/api/testnet-status': {
+      target: 'https://rpc.testnet.aztec-labs.com',
       changeOrigin: true,
       rewrite: () => '/status',
     },
-    '/api/devnet': {
-      target: 'https://v4-devnet-2.aztec-labs.com',
+    '/api/testnet': {
+      target: 'https://rpc.testnet.aztec-labs.com',
       changeOrigin: true,
-      rewrite: (path: string) => path.replace(/^\/api\/devnet/, '') || '/',
+      rewrite: (path: string) => path.replace(/^\/api\/testnet/, '') || '/',
     },
   };
 

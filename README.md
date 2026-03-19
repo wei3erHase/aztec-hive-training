@@ -8,7 +8,7 @@ A privacy-preserving on-chain neural network training application built on Aztec
 - 🔐 **Private training** — gradient updates computed client-side, committed on-chain via hash
 - ✏️ **Draw-to-predict** — canvas input processed through MNIST pipeline, classified by the contract
 - ⛽ **Sponsored fee payments** — gasless transactions through SponsoredFPC
-- 🔄 **Network switching** between Devnet and local network
+- 🔄 **Network switching** between Testnet and local network
 
 ---
 
@@ -35,7 +35,7 @@ yarn install
 bash -i <(curl -s https://install.aztec.network)
 
 # Install the matching Aztec version (see package.json config.aztecVersion)
-aztec-up install 4.0.0-devnet.2-patch.1
+aztec-up install $(node -e "console.log(require('./package.json').config?.aztecVersion ?? 'latest')")
 
 # Terminal 1: Start Anvil (local L1 chain)
 anvil --host 0.0.0.0 -p 8545 --block-time 12
@@ -67,13 +67,13 @@ yarn test:nr                  # Run Noir contract tests (aztec test)
 ```bash
 yarn deploy-contracts                    # Deploy to local network (default)
 yarn deploy-contracts:local-network      # Deploy to local network
-yarn deploy-contracts:devnet             # Deploy to devnet
+yarn deploy-contracts:testnet            # Deploy to testnet (requires SPONSOR_FPC_SALT)
 yarn deploy-contracts:all                # Deploy to both
 ```
 
 Deployed addresses are written to:
 - `config/deployed.local.json` — local network (gitignored)
-- `config/deployed.json` — devnet (committed)
+- `config/deployed.json` — testnet (committed)
 
 ### App
 
@@ -96,15 +96,6 @@ yarn lint                     # Check formatting (ESLint + Prettier)
 yarn lint:fix                 # Auto-fix formatting
 ```
 
-### Environment Variables
-
-Copy `.env.example` to `.env`:
-
-```bash
-VITE_AZTEC_NODE_URL=http://localhost:8080   # Aztec node URL
-VITE_PROVER_ENABLED=false                   # Disable prover for faster development
-```
-
 ---
 
 ## Project Structure
@@ -121,12 +112,12 @@ aztec-hyve-training/
 │   ├── multi_layer_perceptron/    # On-chain MLP (64→16→10)
 │   └── cnn_gap_contract/          # On-chain CNN+GAP network
 ├── scripts/
-│   ├── deploy.ts                  # Deployment script (local network + devnet)
+│   ├── deploy.ts                  # Deployment script (local network + testnet)
 │   ├── build-contracts.ts         # Contract compile + codegen helper
 │   ├── pretrained-weights.ts      # Pre-trained weight loaders
 │   └── weight-packing.ts          # 9-bit weight packing utilities
 ├── config/
-│   ├── deployed.json              # Devnet deployment addresses (committed)
+│   ├── deployed.json              # Testnet deployment addresses (committed)
 │   └── deployed.local.json        # Local deployment addresses (gitignored)
 ├── src/
 │   ├── artifacts/                 # Generated contract TypeScript bindings
@@ -238,7 +229,7 @@ No changes needed to hooks, providers, or `BrowserWalletConnector` — the adapt
 | Network | Node URL | Usage |
 | ------- | -------- | ----- |
 | Local Network | `http://localhost:8080` | Development |
-| Devnet | `https://v4-devnet-2.aztec-labs.com` | Public testnet |
+| Testnet | `https://rpc.testnet.aztec-labs.com/` | Public testnet |
 
 ---
 

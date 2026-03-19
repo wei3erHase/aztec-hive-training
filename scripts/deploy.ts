@@ -1,16 +1,16 @@
 #!/usr/bin/env tsx
 /**
- * Deploy ZKML pretrained contracts to local-network and/or devnet.
+ * Deploy ZKML pretrained contracts to local-network and/or testnet.
  *
  * Usage:
- *   yarn deploy-contracts                          # deploys to local-network (default)
- *   yarn deploy-contracts --network local-network  # deploy to local network
- *   yarn deploy-contracts --network devnet         # deploy to devnet
- *   yarn deploy-contracts --network all            # deploy to both local-network and devnet
+ *   yarn deploy-contracts                           # deploys to local-network (default)
+ *   yarn deploy-contracts --network local-network   # deploy to local network
+ *   yarn deploy-contracts --network testnet         # deploy to testnet
+ *   yarn deploy-contracts --network all             # deploy to both local-network and testnet
  *
  * Prerequisites:
  *   - Local network: run `aztec start --local-network` on port 8080
- *   - Devnet: ensure network is reachable
+ *   - Testnet: SPONSOR_FPC_SALT env var must be set (local-network uses the genesis default)
  *   - Contracts must be built: yarn build-contracts
  */
 
@@ -18,8 +18,9 @@ import { AztecAddress } from '@aztec/aztec.js/addresses';
 import { getContractInstanceFromInstantiationParams } from '@aztec/aztec.js/contracts';
 import { SponsoredFeePaymentMethod } from '@aztec/aztec.js/fee';
 import { Fr } from '@aztec/aztec.js/fields';
-import { createAztecNodeClient, waitForNode } from '@aztec/aztec.js/node';
+import { getFeeJuiceBalance } from '@aztec/aztec.js/utils';
 import { SPONSORED_FPC_SALT } from '@aztec/constants';
+import { createAztecNodeClient, waitForNode } from '@aztec/aztec.js/node';
 import { createStore } from '@aztec/kv-store/lmdb';
 import { SponsoredFPCContractArtifact } from '@aztec/noir-contracts.js/SponsoredFPC';
 import { createPXE } from '@aztec/pxe/client/bundle';
@@ -38,7 +39,31 @@ import { packToFields } from './weight-packing.js';
 
 const NETWORK_URLS: Record<string, string> = {
   'local-network': 'http://localhost:8080',
-  devnet: 'https://v4-devnet-2.aztec-labs.com',
+  testnet: 'https://rpc.testnet.aztec-labs.com/',
+};
+
+/**
+ * Resolves the SponsoredFPC contract instance per network:
+ * - local-network: canonical genesis salt from @aztec/constants (salt=0)
+ * - testnet: derived from SPONSOR_FPC_SALT env var
+ */
+const getSponsoredFpcInstance = async (networkId: string) => {
+  let salt: Fr;
+  if (networkId === 'local-network') {
+    salt = new Fr(SPONSORED_FPC_SALT);
+  } else {
+    const envSalt = process.env.SPONSOR_FPC_SALT;
+    if (!envSalt) {
+      throw new Error(
+        'SPONSOR_FPC_SALT env var must be set when deploying to testnet'
+      );
+    }
+    salt = Fr.fromHexString(envSalt);
+  }
+  return getContractInstanceFromInstantiationParams(
+    SponsoredFPCContractArtifact,
+    { salt }
+  );
 };
 
 const CONFIG_DIR = path.join(process.cwd(), 'config');
@@ -72,7 +97,7 @@ async function deployToNetwork(networkId: string): Promise<void> {
   const pxeStore = await getOrCreateStore(networkId);
   const pxeConfig = getPXEConfig();
   pxeConfig.l1Contracts = l1Contracts;
-  // Local network accepts dummy proofs; devnet requires real proofs from the client prover.
+  // Local network accepts dummy proofs; testnet requires real proofs from the client prover.
   pxeConfig.proverEnabled = networkId !== 'local-network';
   const pxe = await createPXE(aztecNode, pxeConfig, { store: pxeStore });
 
@@ -80,13 +105,20 @@ async function deployToNetwork(networkId: string): Promise<void> {
   const { MinimalWallet } = await import('../src/utils/MinimalWallet.js');
   const deployWallet = new MinimalWallet(pxe, aztecNode);
 
-  // SponsoredFPC is pre-deployed at genesis on both local-network and devnet.
+  // SponsoredFPC is pre-deployed at genesis on both local-network and testnet.
   // Register the artifact so the PXE can resolve its function selectors during simulation.
-  const sponsoredFPCInstance = await getContractInstanceFromInstantiationParams(
-    SponsoredFPCContractArtifact,
-    { salt: new Fr(SPONSORED_FPC_SALT) }
+  const sponsoredFPCInstance = await getSponsoredFpcInstance(networkId);
+  const fpcFJBalance = await getFeeJuiceBalance(
+    sponsoredFPCInstance.address,
+    aztecNode
   );
-
+  console.log(`  SponsoredFPC: ${sponsoredFPCInstance.address.toString()}`);
+  console.log(`  FPC Fee Juice balance: ${fpcFJBalance}`);
+  if (fpcFJBalance === 0n) {
+    throw new Error(
+      `SponsoredFPC at ${sponsoredFPCInstance.address.toString()} has zero Fee Juice balance. Fund it before deploying.`
+    );
+  }
   await pxe.registerContract({
     instance: sponsoredFPCInstance,
     artifact: SponsoredFPCContractArtifact,
@@ -94,7 +126,6 @@ async function deployToNetwork(networkId: string): Promise<void> {
   const paymentMethod = new SponsoredFeePaymentMethod(
     sponsoredFPCInstance.address
   );
-  console.log(`  SponsoredFPC: ${sponsoredFPCInstance.address.toString()}`);
 
   // Contract artifacts
   const { SingleLayerContract } = await import(
@@ -185,13 +216,15 @@ async function deployToNetwork(networkId: string): Promise<void> {
   }
 
   // Write deployment config
+  // - local-network → config/deployed.local.json (gitignored, injected by Vite plugin)
+  // - testnet       → config/deployed.json        (committed, read directly by the app)
   const outputPath =
     networkId === 'local-network'
       ? path.join(CONFIG_DIR, 'deployed.local.json')
       : path.join(CONFIG_DIR, 'deployed.json');
 
   let existing: Record<string, unknown> = {};
-  if (networkId !== 'local-network' && fs.existsSync(outputPath)) {
+  if (fs.existsSync(outputPath)) {
     existing = JSON.parse(fs.readFileSync(outputPath, 'utf-8'));
   }
 
@@ -217,7 +250,7 @@ async function main() {
     process.env.DEPLOY_NETWORK ??
     'all';
 
-  const networks = network === 'all' ? ['local-network', 'devnet'] : [network];
+  const networks = network === 'all' ? ['local-network', 'testnet'] : [network];
 
   try {
     for (const n of networks) {

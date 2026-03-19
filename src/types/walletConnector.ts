@@ -3,13 +3,6 @@ import type { SponsoredFeePaymentMethod } from '@aztec/aztec.js/fee';
 import type { Wallet } from '@aztec/aztec.js/wallet';
 import type { PXE } from '@aztec/pxe/server';
 import { WalletType, ExternalSignerType } from './aztec';
-import type {
-  BrowserWalletOperation,
-  BrowserWalletOperationResult,
-  ConnectorTransactionRequest,
-  ConnectorTransactionResult,
-} from './browserWallet';
-import type { CaipAccount } from '@azguardwallet/types';
 
 export type WalletConnectorId = string;
 
@@ -24,8 +17,6 @@ export interface ConnectorStatus {
   status: ConnectionStatus;
   error: string | null;
 }
-
-export type { ConnectorTransactionRequest, ConnectorTransactionResult };
 
 export interface WalletConnector {
   readonly id: WalletConnectorId;
@@ -58,16 +49,9 @@ export interface ExternalSignerWalletConnector extends WalletConnector {
   getSponsoredFeePaymentMethod: () => Promise<SponsoredFeePaymentMethod>;
 }
 
-export interface BrowserWalletConnector extends WalletConnector {
-  readonly type: typeof WalletType.BROWSER_WALLET;
-
-  getCaipAccount: () => CaipAccount | null;
-  sendTransaction: (
-    request: ConnectorTransactionRequest
-  ) => Promise<ConnectorTransactionResult>;
-  executeOperation: (
-    operation: BrowserWalletOperation
-  ) => Promise<BrowserWalletOperationResult>;
+export interface WalletSDKWalletConnector extends WalletConnector {
+  readonly type: typeof WalletType.WALLET_SDK;
+  getSDKWallet: () => Wallet | null;
 }
 
 export const isEmbeddedConnector = (
@@ -82,10 +66,10 @@ export const isExternalSignerConnector = (
   return connector?.type === WalletType.EXTERNAL_SIGNER;
 };
 
-export const isBrowserWalletConnector = (
+export const isWalletSDKConnector = (
   connector: WalletConnector | null | undefined
-): connector is BrowserWalletConnector => {
-  return connector?.type === WalletType.BROWSER_WALLET;
+): connector is WalletSDKWalletConnector => {
+  return connector?.type === WalletType.WALLET_SDK;
 };
 
 export const hasAppManagedPXE = (

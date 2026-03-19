@@ -166,8 +166,8 @@ export function DrawingCanvas({
     >
       <div className="relative w-full max-w-[280px]">
         <motion.div
-          className="relative w-full overflow-hidden rounded-2xl border-2 border-gray-700 bg-white"
-          style={{ aspectRatio: '1' }}
+          className="relative w-full overflow-hidden rounded-2xl border-2 bg-white"
+          style={{ aspectRatio: '1', borderColor: '#374151' }}
           whileHover={
             !disabled ? { borderColor: 'rgba(168, 85, 247, 0.5)' } : undefined
           }

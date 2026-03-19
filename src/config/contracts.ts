@@ -1,7 +1,7 @@
 /**
  * Contract Configuration
  * Reads deployment addresses from:
- *   config/deployed.json       – committed, public networks (devnet, etc.)
+ *   config/deployed.json       – committed, public networks (testnet, etc.)
  *   config/deployed.local.json – gitignored, local-network per-developer (injected by Vite plugin)
  */
 
