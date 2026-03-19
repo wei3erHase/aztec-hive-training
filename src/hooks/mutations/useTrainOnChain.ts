@@ -86,9 +86,11 @@ type ContractType = {
         d: unknown[]
       ) => { send: (opts: unknown) => Promise<unknown> };
       get_all_packed_weights: () => {
-        simulate: (o: unknown) => Promise<unknown>;
+        simulate: (o: unknown) => Promise<{ result: unknown }>;
       };
-      get_packed_biases: () => { simulate: (o: unknown) => Promise<unknown> };
+      get_packed_biases: () => {
+        simulate: (o: unknown) => Promise<{ result: unknown }>;
+      };
     };
   };
 };
@@ -228,21 +230,19 @@ async function submitWithSDKWallet({
 
   const trainingAddress = AztecAddress.fromString(contractAddress);
 
-  // Register the contract in the SDK wallet's PXE (inside the extension) if
-  // it is not already known.  The SDK wallet exposes the same PXE interface.
-  let contractInstance = await (
-    sdkWallet as { getContractInstance: (a: unknown) => Promise<unknown> }
-  ).getContractInstance(trainingAddress);
-  if (!contractInstance) {
-    const aztecNode = createAztecNodeClient(nodeUrl);
-    contractInstance = await aztecNode.getContract(trainingAddress);
-    if (contractInstance) {
-      await (
-        sdkWallet as {
-          registerContract: (i: unknown, a: unknown) => Promise<void>;
-        }
-      ).registerContract(contractInstance, ContractArtifact);
-    }
+  // Always register the contract in the wallet extension's PXE so it can
+  // simulate and send transactions against it.  registerContract is idempotent
+  // — re-registering an already-known contract is a no-op.
+  // Note: the Wallet interface does NOT expose getContractInstance; use
+  // registerContract unconditionally instead of checking first.
+  const aztecNode = createAztecNodeClient(nodeUrl);
+  const contractInstance = await aztecNode.getContract(trainingAddress);
+  if (contractInstance) {
+    await (
+      sdkWallet as {
+        registerContract: (i: unknown, a: unknown) => Promise<void>;
+      }
+    ).registerContract(contractInstance, ContractArtifact);
   }
 
   const contract = ContractClass.at(trainingAddress, sdkWallet);
@@ -264,12 +264,19 @@ async function submitWithSDKWallet({
   const inputPixelsFr = data.inputPixels.map((p) => toFr(p));
   const labelFr = new Fr(data.label);
 
-  const { result: packedWeightsResult } = await contract.methods
-    .get_all_packed_weights()
-    .simulate({ from: accountAddress });
-  const { result: packedBiasesResult } = await contract.methods
-    .get_packed_biases()
-    .simulate({ from: accountAddress });
+  // get_all_packed_weights and get_packed_biases are public view functions
+  // (abi_public + abi_view). msg.sender is irrelevant for pure storage reads,
+  // so ZERO is used as the from address. Both calls are independent — run in
+  // parallel to halve the round-trip overhead.
+  const [{ result: packedWeightsResult }, { result: packedBiasesResult }] =
+    await Promise.all([
+      contract.methods
+        .get_all_packed_weights()
+        .simulate({ from: AztecAddress.ZERO }),
+      contract.methods
+        .get_packed_biases()
+        .simulate({ from: AztecAddress.ZERO }),
+    ]);
 
   const currentPackedWeightsFr = (
     Array.isArray(packedWeightsResult)
@@ -429,12 +436,17 @@ async function submitWithEmbeddedWallet({
   const inputPixelsFr = data.inputPixels.map((p) => toFr(p));
   const labelFr = new Fr(data.label);
 
-  const { result: packedWeightsResult } = await contract.methods
-    .get_all_packed_weights()
-    .simulate({ from: accountAddress });
-  const { result: packedBiasesResult } = await contract.methods
-    .get_packed_biases()
-    .simulate({ from: accountAddress });
+  // Public view functions — msg.sender is irrelevant, ZERO is fine.
+  // Run both in parallel since they are independent storage reads.
+  const [{ result: packedWeightsResult }, { result: packedBiasesResult }] =
+    await Promise.all([
+      contract.methods
+        .get_all_packed_weights()
+        .simulate({ from: AztecAddress.ZERO }),
+      contract.methods
+        .get_packed_biases()
+        .simulate({ from: AztecAddress.ZERO }),
+    ]);
 
   const currentPackedWeightsFr = (
     Array.isArray(packedWeightsResult)

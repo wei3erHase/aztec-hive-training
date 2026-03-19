@@ -61,18 +61,17 @@ export const WalletSDKDiscoveryView: React.FC = () => {
     const startDiscovery = async () => {
       try {
         const node = createAztecNodeClient(nodeUrl);
-        const [chainId, nodeInfo] = await Promise.all([
-          node.getChainId(),
-          node.getNodeInfo(),
-        ]);
+        const nodeInfo = await node.getNodeInfo();
 
         // StrictMode runs effects twice; bail out if cleanup already ran so we
         // don't create a second WalletManager session and trigger duplicate
         // Azguard popups.
         if (cancelled) return;
 
+        // chainId must be the L1 chain ID (e.g. Sepolia = 11155111), not the
+        // Aztec/L2 chain ID.  rollupVersion is the version of the rollup contract.
         const chainInfo = {
-          chainId: new Fr(chainId),
+          chainId: new Fr(nodeInfo.l1ChainId),
           version: new Fr(nodeInfo.rollupVersion),
         };
 

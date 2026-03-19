@@ -1,11 +1,13 @@
 import { create } from 'zustand';
 import type { AccountWithSecretKey } from '@aztec/aztec.js/account';
-import type { Wallet } from '@aztec/aztec.js/wallet';
+import { AztecAddress } from '@aztec/aztec.js/addresses';
+import type { AppCapabilities, GrantedAccountsCapability, Wallet } from '@aztec/aztec.js/wallet';
 import type { WalletProvider } from '@aztec/wallet-sdk/manager';
 import { WALLET_SDK_CONNECTOR_ID } from '../../connectors/WalletSDKConnector';
 import { NetworkService } from '../../services/aztec/network';
 import { WalletType } from '../../types/aztec';
 import { getNetworkStore } from '../network';
+import { getDeploymentConfig } from '../../../config/contracts';
 import { createEmbeddedActions } from './actions/embedded';
 import { isValidPXETransition } from './types';
 import type { WalletStore, WalletState } from './types';
@@ -17,6 +19,68 @@ import type {
 export type { WalletStore, PXEStatus, NetworkStatus } from './types';
 
 const WALLET_CONNECTION_STORAGE_KEY = 'aztec-wallet-connection';
+
+/**
+ * Builds a capability manifest scoped to the contracts deployed on the given
+ * network. Simulation and transaction scopes are declared upfront so the wallet
+ * only shows one permission dialog instead of per-operation popups.
+ */
+function buildCapabilityManifest(networkId: string): AppCapabilities {
+  const deploymentConfig = getDeploymentConfig(networkId);
+  const { singleLayer, multiLayerPerceptron, cnnGap } =
+    deploymentConfig.contracts;
+
+  const contractAddresses = [
+    singleLayer.address,
+    multiLayerPerceptron.address,
+    cnnGap.address,
+  ]
+    .filter((addr): addr is string => !!addr)
+    .map((addr) => AztecAddress.fromString(addr));
+
+  const capabilities: AppCapabilities['capabilities'] = [
+    { type: 'accounts', canGet: true },
+  ];
+
+  if (contractAddresses.length > 0) {
+    capabilities.push({
+      type: 'contracts',
+      contracts: contractAddresses,
+      canRegister: true,
+    });
+
+    // Unconstrained (utility) reads — auto-approved after initial grant
+    capabilities.push({
+      type: 'simulation',
+      utilities: {
+        scope: contractAddresses.flatMap((addr) => [
+          { contract: addr, function: 'get_all_packed_weights' },
+          { contract: addr, function: 'get_packed_biases' },
+        ]),
+      },
+    });
+
+    // Transaction submissions — wallet will still prompt per-tx, but
+    // declaring scope lets it show a meaningful name instead of raw calldata
+    capabilities.push({
+      type: 'transaction',
+      scope: contractAddresses.flatMap((addr) => [
+        { contract: addr, function: 'submit_training_input' },
+      ]),
+    });
+  }
+
+  return {
+    version: '1.0' as const,
+    metadata: {
+      name: 'Hive Neural Network',
+      version: '1.0.0',
+      description: 'Train neural networks on Aztec',
+      url: typeof window !== 'undefined' ? window.location.origin : '',
+    },
+    capabilities,
+  };
+}
 
 interface StoredWalletConnection {
   connectorId: WalletConnectorId;
@@ -181,21 +245,20 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
     return connectWith(connectorId, async () => {
       set({ status: 'connecting', error: null });
 
-      // Request account access — Azguard only grants getChainInfo and
-      // registerSender by default; getAccounts requires an explicit capability request.
+      const { currentConfig } = getNetworkStore();
+      const networkId = currentConfig.name;
+      const manifest = buildCapabilityManifest(networkId);
+
+      // Primary flow: requestCapabilities() shows the unified permission dialog
+      // and returns granted accounts — use that instead of calling getAccounts() directly
+      // (which triggers a separate broken dialog on multi-account wallets).
+      let accounts: { item: AztecAddress; alias?: string }[] = [];
       try {
-        await wallet.requestCapabilities({
-          version: '1.0',
-          metadata: {
-            name: 'Hive Neural Network',
-            version: '1.0',
-            description: 'Train neural networks on Aztec',
-            url: typeof window !== 'undefined' ? window.location.origin : '',
-          },
-          capabilities: [
-            { type: 'accounts', canGet: true, canCreateAuthWit: true },
-          ],
-        });
+        const capabilities = await wallet.requestCapabilities(manifest);
+        const accountsCap = capabilities.granted.find(
+          (c): c is GrantedAccountsCapability => c.type === 'accounts'
+        );
+        accounts = accountsCap?.accounts ?? [];
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         if (msg.includes('Network no longer exists')) {
@@ -205,10 +268,24 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
               'using https://rpc.testnet.aztec-labs.com/ as the RPC URL.'
           );
         }
-        throw err;
+        // Other errors: fall through to getAccounts() fallback below
+        console.warn('[connectWalletSDK] requestCapabilities failed:', msg);
       }
 
-      const accounts = await wallet.getAccounts();
+      // Fallback for wallets that don't support capabilities
+      if (accounts.length === 0) {
+        const raw = await wallet.getAccounts();
+        accounts = raw.map((a) => {
+          // Aliased<AztecAddress> can have .item or .address
+          const inner =
+            (a as unknown as { item?: AztecAddress; address?: AztecAddress })
+              .item ??
+            (a as unknown as { address?: AztecAddress }).address ??
+            (a as unknown as AztecAddress);
+          return { item: inner };
+        });
+      }
+
       const primary = accounts[0];
       if (!primary) {
         throw new Error('Wallet returned no accounts');

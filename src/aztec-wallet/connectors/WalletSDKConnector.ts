@@ -53,11 +53,19 @@ export class WalletSDKConnector implements WalletConnector {
     this._provider = provider;
     this._wallet = wallet;
 
-    this._unsubDisconnect = provider.onDisconnect(async () => {
-      this._wallet = null;
-      this._provider = null;
-      this._unsubDisconnect = null;
-      await getWalletStore().disconnect();
+    // Use a short grace period before treating a disconnect as real.
+    // HMR / Fast Refresh can fire spurious disconnect events from the extension
+    // that self-resolve within a tick. Checking isDisconnected() after 1 s
+    // filters out those false positives during development.
+    this._unsubDisconnect = provider.onDisconnect(() => {
+      setTimeout(async () => {
+        if (provider.isDisconnected?.()) {
+          this._wallet = null;
+          this._provider = null;
+          this._unsubDisconnect = null;
+          await getWalletStore().disconnect();
+        }
+      }, 1000);
     });
   }
 
