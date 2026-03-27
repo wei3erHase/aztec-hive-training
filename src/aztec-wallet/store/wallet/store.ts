@@ -8,6 +8,7 @@ import type {
 } from '@aztec/aztec.js/wallet';
 import type { WalletProvider } from '@aztec/wallet-sdk/manager';
 import { getDeploymentConfig } from '../../../config/contracts';
+import { AVAILABLE_NETWORKS } from '../../../config/networks';
 import { WALLET_SDK_CONNECTOR_ID } from '../../connectors/WalletSDKConnector';
 import { NetworkService } from '../../services/aztec/network';
 import { WalletType } from '../../types/aztec';
@@ -26,8 +27,13 @@ const WALLET_CONNECTION_STORAGE_KEY = 'aztec-wallet-connection';
 
 /**
  * Builds a capability manifest scoped to the contracts deployed on the given
- * network. Simulation and transaction scopes are declared upfront so the wallet
- * only shows one permission dialog instead of per-operation popups.
+ * network. Transaction scope is declared upfront so the wallet only shows one
+ * permission dialog instead of per-operation popups.
+ *
+ * Note: public view reads (get_all_packed_weights, get_packed_biases) are routed
+ * through the local embedded PXE — NOT through the external wallet — to avoid
+ * cross-version PrivateExecutionResult schema issues. They are therefore not
+ * declared here.
  */
 function buildCapabilityManifest(networkId: string): AppCapabilities {
   const deploymentConfig = getDeploymentConfig(networkId);
@@ -47,30 +53,36 @@ function buildCapabilityManifest(networkId: string): AppCapabilities {
   ];
 
   if (contractAddresses.length > 0) {
+    // Resolve the SponsoredFPC address for this network.
+    // The FPC's sponsor_unconditionally() is embedded as the fee payment call
+    // inside every submit_training_input transaction, so it must be in scope.
+    const networkCfg = AVAILABLE_NETWORKS.find((n) => n.name === networkId);
+    const fpcAddresses: AztecAddress[] = networkCfg?.sponsoredFpcAddress
+      ? [AztecAddress.fromString(networkCfg.sponsoredFpcAddress)]
+      : [];
+
     capabilities.push({
       type: 'contracts',
-      contracts: contractAddresses,
+      contracts: [...contractAddresses, ...fpcAddresses],
       canRegister: true,
     });
 
-    // Unconstrained (utility) reads — auto-approved after initial grant
-    capabilities.push({
-      type: 'simulation',
-      utilities: {
-        scope: contractAddresses.flatMap((addr) => [
-          { contract: addr, function: 'get_all_packed_weights' },
-          { contract: addr, function: 'get_packed_biases' },
-        ]),
-      },
-    });
-
-    // Transaction submissions — wallet will still prompt per-tx, but
-    // declaring scope lets it show a meaningful name instead of raw calldata
+    // Every training transaction embeds two private calls:
+    //   1. submit_training_input  — the user's ML training step
+    //   2. sponsor_unconditionally — SponsoredFPC fee payment
+    // Both must be declared so the wallet authorises the full execution payload.
     capabilities.push({
       type: 'transaction',
-      scope: contractAddresses.flatMap((addr) => [
-        { contract: addr, function: 'submit_training_input' },
-      ]),
+      scope: [
+        ...contractAddresses.map((addr) => ({
+          contract: addr,
+          function: 'submit_training_input',
+        })),
+        ...fpcAddresses.map((addr) => ({
+          contract: addr,
+          function: 'sponsor_unconditionally',
+        })),
+      ],
     });
   }
 

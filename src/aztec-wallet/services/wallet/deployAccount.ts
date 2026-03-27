@@ -1,5 +1,6 @@
-import { AztecAddress } from '@aztec/aztec.js/addresses';
+import { NO_FROM } from '@aztec/aztec.js/account';
 import type { AccountManager } from '@aztec/aztec.js/wallet';
+import { ContractInitializationStatus } from '@aztec/aztec.js/wallet';
 import { TxStatus } from '@aztec/stdlib/tx';
 import { AccountDeploymentError } from './errors';
 import type { SharedPXEInstance } from '../aztec/pxe';
@@ -17,7 +18,7 @@ export interface DeployAccountResult {
   /** Whether the account was deployed (false if already initialized) */
   deployed: boolean;
   /** Account address */
-  address: AztecAddress;
+  address: import('@aztec/aztec.js/addresses').AztecAddress;
 }
 
 const DEFAULT_OPTIONS: Required<DeployAccountOptions> = {
@@ -50,7 +51,9 @@ export async function deployAccountIfNotExists(
     try {
       const metadata =
         await pxeInstance.wallet.getContractMetadata(accountAddress);
-      isInitialized = metadata.isContractInitialized;
+      isInitialized =
+        metadata.initializationStatus ===
+        ContractInitializationStatus.INITIALIZED;
       console.log('[deploy-account] Contract initialized:', isInitialized);
     } catch (metaErr) {
       // "Unknown contract" means the instance has never been published on-chain
@@ -77,7 +80,7 @@ export async function deployAccountIfNotExists(
     console.log('[deploy-account] Sending deploy tx...');
 
     await deployMethod.send({
-      from: AztecAddress.ZERO,
+      from: NO_FROM,
       fee: { paymentMethod },
       skipClassPublication: opts.skipClassPublication,
       skipInstancePublication: opts.skipInstancePublication,

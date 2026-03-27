@@ -1,12 +1,15 @@
 import {
   type AccountWithSecretKey,
   type Account,
-  SignerlessAccount,
+  type NoFrom,
+  NO_FROM,
 } from '@aztec/aztec.js/account';
 import { AztecAddress } from '@aztec/aztec.js/addresses';
 import type { AztecNode } from '@aztec/aztec.js/node';
+import { DefaultMultiCallEntrypoint } from '@aztec/entrypoints/multicall';
 import type { PXE } from '@aztec/pxe/server';
-import { BaseWallet } from '@aztec/wallet-sdk/base-wallet';
+import type { ExecutionPayload, TxExecutionRequest } from '@aztec/stdlib/tx';
+import { BaseWallet, type FeeOptions } from '@aztec/wallet-sdk/base-wallet';
 
 /**
  * MinimalWallet extends BaseWallet to bootstrap account creation.
@@ -31,10 +34,6 @@ export class MinimalWallet extends BaseWallet {
   protected async getAccountFromAddress(
     address: AztecAddress
   ): Promise<Account> {
-    if (address.equals(AztecAddress.ZERO)) {
-      return new SignerlessAccount();
-    }
-
     const account = this.addressToAccount.get(address.toString());
     if (!account) {
       throw new Error(
@@ -42,6 +41,44 @@ export class MinimalWallet extends BaseWallet {
       );
     }
     return account;
+  }
+
+  /**
+   * Override to use DefaultMultiCallEntrypoint for NO_FROM transactions.
+   *
+   * The base class uses DefaultEntrypoint for NO_FROM which only accepts a
+   * single call. Contract deployments involve multiple calls (class publication,
+   * instance registration, constructor), so we need DefaultMultiCallEntrypoint.
+   */
+  protected override async createTxExecutionRequestFromPayloadAndFee(
+    executionPayload: ExecutionPayload,
+    from: AztecAddress | NoFrom,
+    feeOptions: FeeOptions
+  ): Promise<TxExecutionRequest> {
+    if (from === NO_FROM) {
+      const feeExecutionPayload =
+        await feeOptions.walletFeePaymentMethod?.getExecutionPayload();
+      const { mergeExecutionPayloads } = await import('@aztec/stdlib/tx');
+      const finalPayload = feeExecutionPayload
+        ? mergeExecutionPayloads([feeExecutionPayload, executionPayload])
+        : executionPayload;
+      const chainInfo = await this.getChainInfo();
+      // Cast through any: @aztec/entrypoints bundles its own nested copy of
+      // @aztec/stdlib, so TypeScript sees structurally-identical types as
+      // incompatible (separate declarations of private 'xCoord'). Safe at runtime.
+      const entrypoint = new DefaultMultiCallEntrypoint();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (entrypoint as any).createTxExecutionRequest(
+        finalPayload,
+        feeOptions.gasSettings,
+        chainInfo
+      ) as TxExecutionRequest;
+    }
+    return super.createTxExecutionRequestFromPayloadAndFee(
+      executionPayload,
+      from,
+      feeOptions
+    );
   }
 
   async getAccounts(): Promise<{ alias: string; item: AztecAddress }[]> {

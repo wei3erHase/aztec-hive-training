@@ -10,10 +10,12 @@
  *
  * Prerequisites:
  *   - Local network: run `aztec start --local-network` on port 8080
- *   - Testnet: SPONSOR_FPC_SALT env var must be set (local-network uses the genesis default)
+ *   - Testnet: SPONSOR_FPC_ADDRESS or SPONSOR_FPC_SALT env var must be set
  *   - Contracts must be built: yarn build-contracts
  */
 
+import { NO_FROM } from '@aztec/aztec.js/account';
+import { loadContractArtifact } from '@aztec/aztec.js/abi';
 import { AztecAddress } from '@aztec/aztec.js/addresses';
 import { getContractInstanceFromInstantiationParams } from '@aztec/aztec.js/contracts';
 import { SponsoredFeePaymentMethod } from '@aztec/aztec.js/fee';
@@ -25,6 +27,7 @@ import { createStore } from '@aztec/kv-store/lmdb';
 import { SponsoredFPCContractArtifact } from '@aztec/noir-contracts.js/SponsoredFPC';
 import { createPXE } from '@aztec/pxe/client/bundle';
 import { getPXEConfig } from '@aztec/pxe/config';
+import { createRequire } from 'node:module';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
@@ -43,27 +46,43 @@ const NETWORK_URLS: Record<string, string> = {
 };
 
 /**
- * Resolves the SponsoredFPC contract instance per network:
+ * Resolves the SponsoredFPC address per network:
  * - local-network: canonical genesis salt from @aztec/constants (salt=0)
- * - testnet: derived from SPONSOR_FPC_SALT env var
+ * - testnet: direct address via SPONSOR_FPC_ADDRESS env var (preferred), or
+ *            computed from SPONSOR_FPC_SALT if SPONSOR_FPC_ADDRESS is not set.
+ *
+ * Using SPONSOR_FPC_ADDRESS is preferred for testnet because the compiled
+ * SponsoredFPC class hash changes with each aztec-nr version, so a fixed salt
+ * produces a different address. SPONSOR_FPC_ADDRESS lets you pin the funded
+ * FPC that was deployed for the running testnet version.
  */
-const getSponsoredFpcInstance = async (networkId: string) => {
-  let salt: Fr;
+const getSponsoredFpcAddress = async (
+  networkId: string
+): Promise<AztecAddress> => {
   if (networkId === 'local-network') {
-    salt = new Fr(SPONSORED_FPC_SALT);
-  } else {
-    const envSalt = process.env.SPONSOR_FPC_SALT;
-    if (!envSalt) {
-      throw new Error(
-        'SPONSOR_FPC_SALT env var must be set when deploying to testnet'
-      );
-    }
-    salt = Fr.fromHexString(envSalt);
+    const instance = await getContractInstanceFromInstantiationParams(
+      SponsoredFPCContractArtifact,
+      { salt: new Fr(SPONSORED_FPC_SALT) }
+    );
+    return instance.address;
   }
-  return getContractInstanceFromInstantiationParams(
+
+  const envAddress = process.env.SPONSOR_FPC_ADDRESS;
+  if (envAddress) {
+    return AztecAddress.fromString(envAddress);
+  }
+
+  const envSalt = process.env.SPONSOR_FPC_SALT;
+  if (!envSalt) {
+    throw new Error(
+      'Either SPONSOR_FPC_ADDRESS or SPONSOR_FPC_SALT env var must be set when deploying to testnet'
+    );
+  }
+  const instance = await getContractInstanceFromInstantiationParams(
     SponsoredFPCContractArtifact,
-    { salt }
+    { salt: Fr.fromHexString(envSalt) }
   );
+  return instance.address;
 };
 
 const CONFIG_DIR = path.join(process.cwd(), 'config');
@@ -101,31 +120,71 @@ async function deployToNetwork(networkId: string): Promise<void> {
   pxeConfig.proverEnabled = networkId !== 'local-network';
   const pxe = await createPXE(aztecNode, pxeConfig, { store: pxeStore });
 
-  // Signerless wallet: handles AztecAddress.ZERO via SignerlessAccount
+  // Signerless wallet: handles NO_FROM via DefaultEntrypoint (no account contract)
   const { MinimalWallet } = await import('../src/utils/MinimalWallet.js');
   const deployWallet = new MinimalWallet(pxe, aztecNode);
 
   // SponsoredFPC is pre-deployed at genesis on both local-network and testnet.
   // Register the artifact so the PXE can resolve its function selectors during simulation.
-  const sponsoredFPCInstance = await getSponsoredFpcInstance(networkId);
-  const fpcFJBalance = await getFeeJuiceBalance(
-    sponsoredFPCInstance.address,
-    aztecNode
-  );
-  console.log(`  SponsoredFPC: ${sponsoredFPCInstance.address.toString()}`);
+  const sponsoredFPCAddress = await getSponsoredFpcAddress(networkId);
+  const fpcFJBalance = await getFeeJuiceBalance(sponsoredFPCAddress, aztecNode);
+  console.log(`  SponsoredFPC: ${sponsoredFPCAddress.toString()}`);
   console.log(`  FPC Fee Juice balance: ${fpcFJBalance}`);
   if (fpcFJBalance === 0n) {
     throw new Error(
-      `SponsoredFPC at ${sponsoredFPCInstance.address.toString()} has zero Fee Juice balance. Fund it before deploying.`
+      `SponsoredFPC at ${sponsoredFPCAddress.toString()} has zero Fee Juice balance. Fund it before deploying.`
     );
   }
-  await pxe.registerContract({
-    instance: sponsoredFPCInstance,
-    artifact: SponsoredFPCContractArtifact,
-  });
-  const paymentMethod = new SponsoredFeePaymentMethod(
-    sponsoredFPCInstance.address
-  );
+  const sponsoredFPCInstance = await aztecNode.getContract(sponsoredFPCAddress);
+  if (sponsoredFPCInstance) {
+    // Try to register with the current artifact.  If the class ID doesn't match
+    // (the on-chain FPC was compiled with a different aztec-nr version), fall back
+    // to `registerContractClass` with the legacy artifact so PXE can prove the
+    // private `sponsor_unconditionally` call without a class ID check.
+    let registered = false;
+    try {
+      await pxe.registerContract({
+        instance: sponsoredFPCInstance,
+        artifact: SponsoredFPCContractArtifact,
+      });
+      registered = true;
+    } catch (regErr) {
+      console.warn(
+        `  [warn] New FPC artifact class mismatch, falling back to legacy artifact: ${(regErr as Error).message}`
+      );
+    }
+
+    if (!registered) {
+      // Use the legacy SponsoredFPC artifact (compiled with aztec-nr v4.1.0-rc.4)
+      // to register the on-chain FPC class so PXE can prove `sponsor_unconditionally()`.
+      try {
+        const _require = createRequire(import.meta.url);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const legacySponsoredFPCJson = _require(
+          './utils/SponsoredFPC_legacy.json'
+        ) as any;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const legacyArtifact = loadContractArtifact(
+          legacySponsoredFPCJson as any
+        );
+        await (
+          pxe as unknown as {
+            registerContractClass: (a: unknown) => Promise<void>;
+          }
+        ).registerContractClass(legacyArtifact);
+        await pxe.registerContract({
+          instance: sponsoredFPCInstance,
+          artifact: legacyArtifact,
+        });
+        console.log('  Registered FPC with legacy artifact (v4.1.0-rc.4).');
+      } catch (legacyErr) {
+        console.warn(
+          `  [warn] Legacy FPC artifact registration also failed: ${(legacyErr as Error).message}`
+        );
+      }
+    }
+  }
+  const paymentMethod = new SponsoredFeePaymentMethod(sponsoredFPCAddress);
 
   // Contract artifacts
   const { SingleLayerContract } = await import(
@@ -137,7 +196,7 @@ async function deployToNetwork(networkId: string): Promise<void> {
   const { CNNGAPContract } = await import('../src/artifacts/CNNGAP.js');
 
   const sendOpts = {
-    from: AztecAddress.ZERO,
+    from: NO_FROM,
     fee: { paymentMethod },
     // Class publication is idempotent (no-op if already registered), so always publish.
     // Skipping it would fail if the class hasn't been published to this network yet.
