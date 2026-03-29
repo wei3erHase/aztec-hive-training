@@ -4572,32 +4572,10 @@
     loupe "^3.1.4"
     tinyrainbow "^2.0.0"
 
-"@wagmi/connectors@7.0.7":
-  version "7.0.7"
-  resolved "https://registry.yarnpkg.com/@wagmi/connectors/-/connectors-7.0.7.tgz#bb22459f062a3da859d3b075ce3319f10cf2fba1"
-  integrity sha512-aJ+Ktjm31htgeIUXWjsomn0KyZUNF3MUT1WSaNKE6h0GZA3zwhiFwk3IbhuYi4qaBnaqEuHkWw6TgRtVqSfCfw==
-
-"@wagmi/core@3.1.0":
-  version "3.1.0"
-  resolved "https://registry.yarnpkg.com/@wagmi/core/-/core-3.1.0.tgz#a57e33b42978b6e6cdf3a5fc37447a2bd6c22607"
-  integrity sha512-+lp2NO3pTP7Rk2y7ZsVZTOAo03ohtdg7epmAtlSMw+MGi83Ylss+6sNMfVetKTyhAh7QofcHxlHP1VgKCev8MA==
-  dependencies:
-    eventemitter3 "5.0.1"
-    mipd "0.0.7"
-    zustand "5.0.0"
-
 "@webgpu/types@*":
   version "0.1.69"
   resolved "https://registry.yarnpkg.com/@webgpu/types/-/types-0.1.69.tgz#6b849bf370a1f29c78bd3aeba8e84c1150b237f2"
   integrity sha512-RPmm6kgRbI8e98zSD3RVACvnuktIja5+yLgDAkTmxLr90BEwdTXRQWNLF3ETTTyH/8mKhznZuN5AveXYFEsMGQ==
-
-"@wonderland/walletless@1.0.0":
-  version "1.0.0"
-  resolved "https://registry.yarnpkg.com/@wonderland/walletless/-/walletless-1.0.0.tgz#54523b460281f7ff3ec1d2839376611eb11ee8ce"
-  integrity sha512-aYY2f+0XzKtTqiXLEgrhPk3U3cewJzJH+EWnpulv/EHrlujjipzpXxM64dBP1TMSEt2t32OH77qEUWCiQLaxUA==
-  dependencies:
-    viem "2.43.5"
-    wagmi "3.2.0"
 
 JSONStream@^1.3.5:
   version "1.3.5"
@@ -7912,11 +7890,6 @@ minipass@^7.1.2:
   resolved "https://registry.yarnpkg.com/minipass/-/minipass-7.1.2.tgz#93a9626ce5e5e66bd4db86849e7515e92340a707"
   integrity sha512-qOOzS1cBTWYF4BH8fVePDBOO9iptMnGUEZwNc/cMWnTV2nVLZ7VoNWEPHkYczZA0pdoA7dl6e7FL659nX9S2aw==
 
-mipd@0.0.7:
-  version "0.0.7"
-  resolved "https://registry.yarnpkg.com/mipd/-/mipd-0.0.7.tgz#bb5559e21fa18dc3d9fe1c08902ef14b7ce32fd9"
-  integrity sha512-aAPZPNDQ3uMTdKbuO2YmAw2TxLHO0moa4YKAyETM/DTj5FloZo+a+8tU+iv4GmW+sOxKLSRwcSFuczk+Cpt6fg==
-
 motion-dom@^12.34.3:
   version "12.34.3"
   resolved "https://registry.yarnpkg.com/motion-dom/-/motion-dom-12.34.3.tgz#56224109a20bf2cb38277bfaedeeda5151ce369d"
@@ -9852,11 +9825,6 @@ use-sidecar@^1.1.3:
     detect-node-es "^1.1.0"
     tslib "^2.0.0"
 
-use-sync-external-store@1.4.0:
-  version "1.4.0"
-  resolved "https://registry.yarnpkg.com/use-sync-external-store/-/use-sync-external-store-1.4.0.tgz#adbc795d8eeb47029963016cefdf89dc799fcebc"
-  integrity sha512-9WXSPC5fMv61vaupRkCKCxsPxBocVnwakBEkMIHHpkTTg6icbJtg6jzgtLDm4bl3cSHAca52rYWih0k4K3PfHw==
-
 use-sync-external-store@^1.2.2, use-sync-external-store@^1.4.0:
   version "1.6.0"
   resolved "https://registry.yarnpkg.com/use-sync-external-store/-/use-sync-external-store-1.6.0.tgz#b174bfa65cb2b526732d9f2ac0a408027876f32d"
@@ -10019,15 +9987,6 @@ w3c-xmlserializer@^5.0.0:
   integrity sha512-o8qghlI8NZHU1lLPrpi2+Uq7abh4GGPpYANlalzWxyWteJOCsr/P+oPBA49TOLu5FTZO4d3F9MnWJfiMo4BkmA==
   dependencies:
     xml-name-validator "^5.0.0"
-
-wagmi@3.2.0:
-  version "3.2.0"
-  resolved "https://registry.yarnpkg.com/wagmi/-/wagmi-3.2.0.tgz#2d72192dce060e96bd0b22bf98ef6427c441796f"
-  integrity sha512-rSaMjiSc9zmBEt2CrTnhhbCJZOf+5c4hkDFlChAq8xUEHb4Av13nQ5/cCLVh2WtvFS1H2OK1FcZ64T6+J4bgHQ==
-  dependencies:
-    "@wagmi/connectors" "7.0.7"
-    "@wagmi/core" "3.1.0"
-    use-sync-external-store "1.4.0"
 
 weak-lru-cache@^1.2.2:
   version "1.2.2"
@@ -10264,11 +10223,6 @@ zod@^3.23.8:
   version "4.3.6"
   resolved "https://registry.yarnpkg.com/zod/-/zod-4.3.6.tgz#89c56e0aa7d2b05107d894412227087885ab112a"
   integrity sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg==
-
-zustand@5.0.0:
-  version "5.0.0"
-  resolved "https://registry.yarnpkg.com/zustand/-/zustand-5.0.0.tgz#71f8aaecf185592a3ba2743d7516607361899da9"
-  integrity sha512-LE+VcmbartOPM+auOjCCLQOsQ05zUTp8RkgwRzefUk+2jISdMMFnxvyTjA4YNWr5ZGXYbVsEMZosttuxUBkojQ==
 
 zustand@5.0.9:
   version "5.0.9"
