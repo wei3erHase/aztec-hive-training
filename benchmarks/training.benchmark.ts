@@ -2,7 +2,6 @@ import {
   Benchmark,
   type BenchmarkContext,
 } from '@defi-wonderland/aztec-benchmark';
-import { NO_FROM } from '@aztec/aztec.js/account';
 import { AztecAddress } from '@aztec/aztec.js/addresses';
 import type { ContractFunctionInteractionCallIntent } from '@aztec/aztec.js/authorization';
 import { getContractInstanceFromInstantiationParams } from '@aztec/aztec.js/contracts';
@@ -95,7 +94,7 @@ export default class TrainingBenchmark extends Benchmark {
       new Fr(BigInt('0x' + randomBytes(32).toString('hex')) % FIELD_MODULUS);
 
     const deployOpts = (salt: Fr) => ({
-      from: NO_FROM,
+      from: deployer,
       fee: { paymentMethod: feePaymentMethod },
       universalDeploy: true,
       skipInitialization: false,
