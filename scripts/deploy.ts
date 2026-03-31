@@ -176,7 +176,9 @@ async function deployToNetwork(networkId: string): Promise<void> {
           instance: sponsoredFPCInstance,
           artifact: legacyArtifact,
         });
-        console.log('  Registered FPC with legacy artifact (4.2.0-aztecnr-rc.2).');
+        console.log(
+          '  Registered FPC with legacy artifact (4.2.0-aztecnr-rc.2).'
+        );
       } catch (legacyErr) {
         console.warn(
           `  [warn] Legacy FPC artifact registration also failed: ${(legacyErr as Error).message}`

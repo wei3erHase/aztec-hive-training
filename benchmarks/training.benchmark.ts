@@ -105,12 +105,15 @@ export default class TrainingBenchmark extends Benchmark {
     // Deploy SingleLayer
     const singlePackedWeights = packToFields(getSingleLayerWeights(), 23, 28);
     const singlePackedBiases = packToFields(getSingleLayerBiases(), 1, 10);
-    const { contract: singleContract } = await SingleLayerContract.deployWithOpts(
-      { wallet, method: 'constructor_pretrained' },
-      singlePackedWeights,
-      singlePackedBiases
-    ).send(deployOpts(mkSalt()));
-    console.log(`SingleLayer deployed at: ${singleContract.address.toString()}`);
+    const { contract: singleContract } =
+      await SingleLayerContract.deployWithOpts(
+        { wallet, method: 'constructor_pretrained' },
+        singlePackedWeights,
+        singlePackedBiases
+      ).send(deployOpts(mkSalt()));
+    console.log(
+      `SingleLayer deployed at: ${singleContract.address.toString()}`
+    );
 
     const { result: singleWeightsRaw } = await singleContract.methods
       .get_all_packed_weights()
@@ -122,11 +125,12 @@ export default class TrainingBenchmark extends Benchmark {
     // Deploy MLP
     const mlpPackedWeights = packToFields(getMLPWeights(), 43, 28);
     const mlpPackedBiases = packToFields(getMLPBiases(), 1, 26);
-    const { contract: mlpContract } = await MultiLayerPerceptronContract.deployWithOpts(
-      { wallet, method: 'constructor_pretrained' },
-      mlpPackedWeights,
-      mlpPackedBiases
-    ).send(deployOpts(mkSalt()));
+    const { contract: mlpContract } =
+      await MultiLayerPerceptronContract.deployWithOpts(
+        { wallet, method: 'constructor_pretrained' },
+        mlpPackedWeights,
+        mlpPackedBiases
+      ).send(deployOpts(mkSalt()));
     console.log(`MLP deployed at: ${mlpContract.address.toString()}`);
 
     const { result: mlpWeightsRaw } = await mlpContract.methods
