@@ -2,6 +2,9 @@ import { test, expect, type Page } from '@playwright/test';
 
 const APP_READY_TIMEOUT = process.env.CI ? 45_000 : 15_000;
 
+/** Set in CI when Aztec is running (see `.github/workflows/run-e2e.yml`). */
+const AZTEC_LIVE = process.env.E2E_AZTEC_LIVE === '1';
+
 async function gotoAndWaitForHome(page: Page) {
   await page.goto('/');
   await page.waitForSelector('[data-testid="home-page"]', {
@@ -10,8 +13,8 @@ async function gotoAndWaitForHome(page: Page) {
 }
 
 // ============================================================================
-// Smoke tests – run against the live dev server at http://localhost:3000
-// Covers the unauthenticated state (no wallet connected, no Aztec node running).
+// Smoke tests – run against http://localhost:3000 (Vite preview or reused dev server).
+// Covers unauthenticated state (no wallet). RPC expectations depend on E2E_AZTEC_LIVE.
 // ============================================================================
 
 test.describe('App shell', () => {
@@ -82,8 +85,8 @@ test.describe('Home page — unauthenticated state', () => {
   });
 });
 
-test.describe('Network / connection state (no local Aztec node running)', () => {
-  test('app does NOT crash — root element is still present after connection failure', async ({
+test.describe('Network / connection state', () => {
+  test('app does NOT crash — root element is still present', async ({
     page,
   }) => {
     await gotoAndWaitForHome(page);
@@ -91,19 +94,22 @@ test.describe('Network / connection state (no local Aztec node running)', () => 
     await expect(page.locator('#root')).toBeVisible();
   });
 
-  test('no Aztec block number is displayed (node not reachable)', async ({
-    page,
-  }) => {
+  test('hero network badge matches Aztec availability', async ({ page }) => {
     await gotoAndWaitForHome(page);
     await page.waitForLoadState('domcontentloaded');
-    // No block number indicator should be present or visible
-    const blockEl = page.locator('[data-testid="block-number"]');
-    const count = await blockEl.count();
-    if (count === 0) return;
-    await expect(blockEl.first()).not.toBeVisible();
+    if (AZTEC_LIVE) {
+      // Connected badge shows a resolved height (#123) or "#..." while fetching.
+      await expect(
+        page.getByText(/Local Network\s*(#\d+|#\.\.\.)/)
+      ).toBeVisible({ timeout: APP_READY_TIMEOUT });
+    } else {
+      await expect(
+        page.getByText(/Offline|Local network is not running/i)
+      ).toBeVisible({ timeout: APP_READY_TIMEOUT });
+    }
   });
 
-  test('/rpc proxy fails — Aztec node is not running', async ({ page }) => {
+  test('/rpc proxy matches Aztec availability', async ({ page }) => {
     // Register listener BEFORE navigation so it captures the first mount-cycle RPC call
     let rpcStatus: number | 'network-error' | null = null;
 
@@ -119,15 +125,12 @@ test.describe('Network / connection state (no local Aztec node running)', () => 
     });
 
     await gotoAndWaitForHome(page);
-    // Give the app's checkConnection() useEffect time to fire and complete
     await page.waitForFunction(() => document.readyState === 'complete', {
       timeout: 10_000,
     });
-    // Avoid long networkidle waits; poll briefly for the first RPC attempt
     await page.waitForTimeout(2_500);
 
     if (rpcStatus === null) {
-      // No /rpc request observed — skip rather than silently passing
       test.skip(
         true,
         'No /rpc request observed — app may use a different endpoint'
@@ -135,11 +138,19 @@ test.describe('Network / connection state (no local Aztec node running)', () => 
       return;
     }
 
-    // Either a network-level failure or an HTTP error (5xx from Vite proxy)
-    const failed =
-      rpcStatus === 'network-error' ||
-      (typeof rpcStatus === 'number' && rpcStatus >= 500);
-    expect(failed).toBe(true);
+    if (AZTEC_LIVE) {
+      expect(rpcStatus).not.toBe('network-error');
+      expect(
+        typeof rpcStatus === 'number' &&
+          rpcStatus >= 200 &&
+          rpcStatus < 300
+      ).toBe(true);
+    } else {
+      const failed =
+        rpcStatus === 'network-error' ||
+        (typeof rpcStatus === 'number' && rpcStatus >= 500);
+      expect(failed).toBe(true);
+    }
   });
 });
 

@@ -40,4 +40,7 @@ jobs:
         run: yarn playwright install --with-deps chromium
 
       - name: Run E2E tests
+        env:
+          # setup-aztec + deploy leave a node on :8080; tests must expect RPC success, not "node down".
+          E2E_AZTEC_LIVE: '1'
         run: yarn playwright test --project=chromium

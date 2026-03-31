@@ -43,9 +43,8 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: process.env.CI
-      ? 'PORT=3000 yarn dev'
-      : 'PORT=3000 yarn serve',
+    // Always serve the production build: CI runs `yarn build-app:ci` first; local `yarn test:e2e` runs `prep-test` (build) first.
+    command: 'PORT=3000 yarn serve',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
     timeout: process.env.CI ? 120_000 : 30_000,
