@@ -281,7 +281,8 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
           throw new Error(
             'The Aztec testnet is not configured in your wallet. ' +
               'Please open Azguard, go to Networks, and add the testnet ' +
-              'using https://rpc.testnet.aztec-labs.com/ as the RPC URL.'
+              'using https://rpc.testnet.aztec-labs.com/ as the RPC URL.',
+            { cause: err }
           );
         }
         // Other errors: fall through to getAccounts() fallback below

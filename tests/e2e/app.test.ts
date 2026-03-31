@@ -141,9 +141,7 @@ test.describe('Network / connection state', () => {
     if (AZTEC_LIVE) {
       expect(rpcStatus).not.toBe('network-error');
       expect(
-        typeof rpcStatus === 'number' &&
-          rpcStatus >= 200 &&
-          rpcStatus < 300
+        typeof rpcStatus === 'number' && rpcStatus >= 200 && rpcStatus < 300
       ).toBe(true);
     } else {
       const failed =
