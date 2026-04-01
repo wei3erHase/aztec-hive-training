@@ -46,30 +46,41 @@ const NETWORK_URLS: Record<string, string> = {
 };
 
 /**
- * Resolves the SponsoredFPC address per network:
- * - local-network: canonical genesis salt from @aztec/constants (salt=0)
- * - testnet: direct address via SPONSOR_FPC_ADDRESS env var (preferred), or
- *            computed from SPONSOR_FPC_SALT if SPONSOR_FPC_ADDRESS is not set.
+ * Resolves the SponsoredFPC instance per network.
  *
- * Using SPONSOR_FPC_ADDRESS is preferred for testnet because the compiled
- * SponsoredFPC class hash changes with each aztec-nr version, so a fixed salt
- * produces a different address. SPONSOR_FPC_ADDRESS lets you pin the funded
- * FPC that was deployed for the running testnet version.
+ * - local-network: derived from the canonical genesis salt (@aztec/constants).
+ *   `aztecNode.getContract` does not expose genesis contracts, so we always
+ *   compute the instance locally from the known salt.
+ * - testnet (SPONSOR_FPC_ADDRESS set): the address is known but the salt isn't,
+ *   so we still need the node to provide the instance data.
+ * - testnet (SPONSOR_FPC_SALT set): derived from the declared salt, same as
+ *   local-network path.
+ *
+ * Returning the full instance (not just the address) lets the caller register
+ * it with the PXE without a separate `getContract` call that may return undefined.
  */
-const getSponsoredFpcAddress = async (
-  networkId: string
-): Promise<AztecAddress> => {
+const getSponsoredFpcInstance = async (
+  networkId: string,
+  aztecNode: Awaited<ReturnType<typeof createAztecNodeClient>>
+) => {
   if (networkId === 'local-network') {
-    const instance = await getContractInstanceFromInstantiationParams(
+    return getContractInstanceFromInstantiationParams(
       SponsoredFPCContractArtifact,
       { salt: new Fr(SPONSORED_FPC_SALT) }
     );
-    return instance.address;
   }
 
   const envAddress = process.env.SPONSOR_FPC_ADDRESS;
   if (envAddress) {
-    return AztecAddress.fromString(envAddress);
+    const instance = await aztecNode.getContract(
+      AztecAddress.fromString(envAddress)
+    );
+    if (!instance) {
+      throw new Error(
+        `SponsoredFPC at SPONSOR_FPC_ADDRESS=${envAddress} not found on node. Verify the address is correct.`
+      );
+    }
+    return instance;
   }
 
   const envSalt = process.env.SPONSOR_FPC_SALT;
@@ -78,11 +89,10 @@ const getSponsoredFpcAddress = async (
       'Either SPONSOR_FPC_ADDRESS or SPONSOR_FPC_SALT env var must be set when deploying to testnet'
     );
   }
-  const instance = await getContractInstanceFromInstantiationParams(
+  return getContractInstanceFromInstantiationParams(
     SponsoredFPCContractArtifact,
     { salt: Fr.fromHexString(envSalt) }
   );
-  return instance.address;
 };
 
 const CONFIG_DIR = path.join(process.cwd(), 'config');
@@ -126,7 +136,13 @@ async function deployToNetwork(networkId: string): Promise<void> {
 
   // SponsoredFPC is pre-deployed at genesis on both local-network and testnet.
   // Register the artifact so the PXE can resolve its function selectors during simulation.
-  const sponsoredFPCAddress = await getSponsoredFpcAddress(networkId);
+  // NOTE: `aztecNode.getContract` returns undefined for genesis-deployed contracts on fresh
+  // local networks, so we always derive the instance from the declared salt instead.
+  const sponsoredFPCInstance = await getSponsoredFpcInstance(
+    networkId,
+    aztecNode
+  );
+  const sponsoredFPCAddress = sponsoredFPCInstance.address;
   const fpcFJBalance = await getFeeJuiceBalance(sponsoredFPCAddress, aztecNode);
   console.log(`  SponsoredFPC: ${sponsoredFPCAddress.toString()}`);
   console.log(`  FPC Fee Juice balance: ${fpcFJBalance}`);
@@ -135,8 +151,8 @@ async function deployToNetwork(networkId: string): Promise<void> {
       `SponsoredFPC at ${sponsoredFPCAddress.toString()} has zero Fee Juice balance. Fund it before deploying.`
     );
   }
-  const sponsoredFPCInstance = await aztecNode.getContract(sponsoredFPCAddress);
-  if (sponsoredFPCInstance) {
+
+  {
     // Try to register with the current artifact.  If the class ID doesn't match
     // (the on-chain FPC was compiled with a different aztec-nr version), fall back
     // to `registerContractClass` with the legacy artifact so PXE can prove the
