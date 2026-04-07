@@ -5,6 +5,27 @@ const APP_READY_TIMEOUT = process.env.CI ? 45_000 : 15_000;
 /** Set in CI when Aztec is running (see `.github/workflows/run-e2e.yml`). */
 const AZTEC_LIVE = process.env.E2E_AZTEC_LIVE === '1';
 
+/** Hero badge: `Local Network #42` or `Local Network #...` while block height loads. */
+const AZTEC_CONNECTED_BADGE = /Local Network\s*(#\d+|#\.\.\.)/;
+
+/**
+ * After deploy, PXE/RPC can lag; `useNetworkStatus` only re-checks every 10s.
+ * Poll so we do not fail while the stack is still becoming ready.
+ */
+function aztecLiveBadgeTimeoutMs(): number {
+  if (!AZTEC_LIVE) return APP_READY_TIMEOUT;
+  return process.env.CI ? 180_000 : 60_000;
+}
+
+async function expectConnectedLocalNetworkBadge(page: Page) {
+  await expect
+    .poll(async () => page.getByText(AZTEC_CONNECTED_BADGE).isVisible(), {
+      timeout: aztecLiveBadgeTimeoutMs(),
+      intervals: [1_000, 2_000, 3_000, 5_000],
+    })
+    .toBe(true);
+}
+
 async function gotoAndWaitForHome(page: Page) {
   await page.goto('/');
   await page.waitForSelector('[data-testid="home-page"]', {
@@ -98,10 +119,7 @@ test.describe('Network / connection state', () => {
     await gotoAndWaitForHome(page);
     await page.waitForLoadState('domcontentloaded');
     if (AZTEC_LIVE) {
-      // Connected badge shows a resolved height (#123) or "#..." while fetching.
-      await expect(
-        page.getByText(/Local Network\s*(#\d+|#\.\.\.)/)
-      ).toBeVisible({ timeout: APP_READY_TIMEOUT });
+      await expectConnectedLocalNetworkBadge(page);
     } else {
       await expect(
         page.getByText(/Offline|Local network is not running/i)
