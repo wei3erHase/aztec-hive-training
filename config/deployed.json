@@ -1,15 +1,15 @@
 {
   "testnet": {
     "singleLayer": {
-      "address": "0x208c71732b8c2ec1f0fcef9ba83352ac6db709168d491269100fb2fe1625defb",
+      "address": "0x2faf1d30acc8ab4d565bc6c03d9e763f939500d3dc572f96722a0558be4bef7f",
       "constructorName": "constructor_pretrained"
     },
     "multiLayerPerceptron": {
-      "address": "0x124c39a365a256f5a8b05a04f1b331e3ee7206914171b5810a51fda06878354a",
+      "address": "0x1887a2fd2daea9f5d80a9c11da6f7f2662192a04efbdd87018cf04bcbfb6b790",
       "constructorName": "constructor_pretrained"
     },
     "cnnGap": {
-      "address": "0x050422055ced07ab9f3bbcd9783223db7b77cd3cd85a48d11be338e5801342c1",
+      "address": "0x1cfc6a3f90e70218694d46e999c0985386d12517dc5c0340a42965377f8596c2",
       "constructorName": "constructor_pretrained"
     }
   }

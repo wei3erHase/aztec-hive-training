@@ -5,6 +5,15 @@ const APP_READY_TIMEOUT = process.env.CI ? 45_000 : 15_000;
 /** Set in CI when Aztec is running (see `.github/workflows/run-e2e.yml`). */
 const AZTEC_LIVE = process.env.E2E_AZTEC_LIVE === '1';
 
+/**
+ * Must match `STORAGE_KEY` in `src/aztec-wallet/store/network/store.ts`.
+ * Fresh Playwright sessions default the app to testnet (first entry in
+ * `AVAILABLE_NETWORKS`); CI runs a local node, so we force local-network
+ * before any navigation — otherwise the hero shows "Aztec Testnet" and
+ * `/rpc` is never used.
+ */
+const WALLET_NETWORK_STORAGE_KEY = 'aztec-wallet-network';
+
 /** Hero badge: `Local Network #42` or `Local Network #...` while block height loads. */
 const AZTEC_CONNECTED_BADGE = /Local Network\s*(#\d+|#\.\.\.)/;
 
@@ -14,7 +23,7 @@ const AZTEC_CONNECTED_BADGE = /Local Network\s*(#\d+|#\.\.\.)/;
  */
 function aztecLiveBadgeTimeoutMs(): number {
   if (!AZTEC_LIVE) return APP_READY_TIMEOUT;
-  return process.env.CI ? 180_000 : 60_000;
+  return process.env.CI ? 90_000 : 60_000;
 }
 
 async function expectConnectedLocalNetworkBadge(page: Page) {
@@ -32,6 +41,13 @@ async function gotoAndWaitForHome(page: Page) {
     timeout: APP_READY_TIMEOUT,
   });
 }
+
+test.beforeEach(async ({ page }) => {
+  if (!AZTEC_LIVE) return;
+  await page.addInitScript((key: string) => {
+    localStorage.setItem(key, 'local-network');
+  }, WALLET_NETWORK_STORAGE_KEY);
+});
 
 // ============================================================================
 // Smoke tests – run against http://localhost:3000 (Vite preview or reused dev server).

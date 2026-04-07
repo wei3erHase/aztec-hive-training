@@ -46,6 +46,37 @@ const NETWORK_URLS: Record<string, string> = {
 };
 
 /**
+ * Load project `.env` when present so bare `yarn deploy-contracts` and
+ * `yarn deploy-contracts --network=all` pick up `SPONSOR_FPC_*` without
+ * requiring `tsx --env-file=.env`. Does not override existing env vars.
+ */
+function loadOptionalDotEnv(): void {
+  const envPath = path.join(process.cwd(), '.env');
+  if (!fs.existsSync(envPath)) return;
+  const raw = fs.readFileSync(envPath, 'utf-8');
+  for (let line of raw.split('\n')) {
+    line = line.trim();
+    if (!line || line.startsWith('#')) continue;
+    const eq = line.indexOf('=');
+    if (eq <= 0) continue;
+    const key = line.slice(0, eq).trim();
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) continue;
+    let value = line.slice(eq + 1).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    if (process.env[key] === undefined) {
+      process.env[key] = value;
+    }
+  }
+}
+
+loadOptionalDotEnv();
+
+/**
  * Resolves the SponsoredFPC instance per network.
  *
  * - local-network: derived from the canonical genesis salt (@aztec/constants).
@@ -325,7 +356,7 @@ async function main() {
   const network =
     (networkFromEq ? networkFromEq.split('=')[1] : networkFromSplit) ??
     process.env.DEPLOY_NETWORK ??
-    'all';
+    'local-network';
 
   const networks = network === 'all' ? ['local-network', 'testnet'] : [network];
 
