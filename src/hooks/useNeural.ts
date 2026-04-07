@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
+import { NO_FROM } from '@aztec/aztec.js/account';
 import { AztecAddress } from '@aztec/aztec.js/addresses';
 import { Fr } from '@aztec/aztec.js/fields';
 import { useAztecWallet } from '../aztec-wallet/hooks/useAztecWallet';
@@ -56,7 +57,6 @@ export interface NeuralState {
 interface CachedSetup {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   contract: any;
-  callerAddress: AztecAddress;
 }
 
 // Keyed by `${networkId}:${arch}:${contractAddress}`.
@@ -137,12 +137,9 @@ async function doSetupContract(
   );
   const { pxe, wallet } = pxeInstance;
 
-  // predict_all and shapley_for_class are unconstrained (public) functions.
-  // They do NOT access private state, so the caller identity is irrelevant.
-  // Using AztecAddress.ZERO avoids AccountManager.create (which lazily
-  // initialises the ECDSA account contract artifact and can hang on a cold
-  // browser context, blocking all predictions indefinitely).
-  const callerAddress = AztecAddress.ZERO;
+  // predict_all and shapley_for_class are public view functions; caller
+  // identity is irrelevant. NO_FROM routes through DefaultEntrypoint without
+  // account contract mediation, avoiding unnecessary AccountManager overhead.
 
   const artifact = await getContractArtifact(arch);
   const address = AztecAddress.fromString(contractAddress);
@@ -162,7 +159,7 @@ async function doSetupContract(
     wallet as Parameters<typeof ContractClass.at>[1]
   );
 
-  const result: CachedSetup = { contract, callerAddress };
+  const result: CachedSetup = { contract };
   contractSetupCache.set(cacheKey, result);
   return result;
 }
@@ -283,7 +280,7 @@ export function useNeural(initialArchitecture: ArchitectureId = 'mlp') {
         );
       }
       const nodeUrl = network?.nodeUrl ?? 'http://localhost:8080';
-      const { contract, callerAddress } = await setupContract(
+      const { contract } = await setupContract(
         arch,
         contractAddress,
         nodeUrl,
@@ -294,7 +291,7 @@ export function useNeural(initialArchitecture: ArchitectureId = 'mlp') {
       const inputPixels = pixelsToFields(downscaleTo8x8(imageData.pixels));
       const { result } = await contract.methods
         .predict_all(inputPixels)
-        .simulate({ from: callerAddress });
+        .simulate({ from: NO_FROM });
 
       const probs = parseProbabilities(result);
       const digit = probs.length > 0 ? probs.indexOf(Math.max(...probs)) : 0;
@@ -327,7 +324,7 @@ export function useNeural(initialArchitecture: ArchitectureId = 'mlp') {
 
       const nodeUrl = network?.nodeUrl ?? 'http://localhost:8080';
       const startTime = performance.now();
-      const { contract, callerAddress } = await setupContract(
+      const { contract } = await setupContract(
         arch,
         contractAddress,
         nodeUrl,
@@ -340,7 +337,7 @@ export function useNeural(initialArchitecture: ArchitectureId = 'mlp') {
       try {
         ({ result: rawResult } = await contract.methods
           .shapley_for_class(inputPixels, new Fr(BigInt(targetClass)))
-          .simulate({ from: callerAddress }));
+          .simulate({ from: NO_FROM }));
       } catch (simError) {
         const errMsg =
           simError instanceof Error ? simError.message : String(simError);

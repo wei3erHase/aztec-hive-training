@@ -17,5 +17,5 @@ export const TESTNET_CONFIG: NetworkConfig = {
   proverEnabled: true,
   isTestnet: true,
   sponsoredFpcAddress:
-    '0x1aa49f0ed1b28cf27b5747deceb89addc85d53ab5bc66406c4f429ccf9e1b8ee',
+    '0x1e2e59ede08460bf957ab1a349d64d84ff8ffecc03528bd6e111c608a2ba2c6c',
 };

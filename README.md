@@ -67,7 +67,7 @@ yarn test:nr                  # Run Noir contract tests (aztec test)
 ```bash
 yarn deploy-contracts                    # Deploy to local network (default)
 yarn deploy-contracts:local-network      # Deploy to local network
-yarn deploy-contracts:testnet            # Deploy to testnet (requires SPONSOR_FPC_SALT)
+yarn deploy-contracts:testnet            # Deploy to testnet (needs SPONSOR_FPC_ADDRESS or SPONSOR_FPC_SALT in .env)
 yarn deploy-contracts:all                # Deploy to both
 ```
 

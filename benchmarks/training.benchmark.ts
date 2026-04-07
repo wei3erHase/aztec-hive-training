@@ -9,7 +9,7 @@ import { SponsoredFeePaymentMethod } from '@aztec/aztec.js/fee';
 import { Fr } from '@aztec/aztec.js/fields';
 import { createAztecNodeClient, waitForNode } from '@aztec/aztec.js/node';
 import { SPONSORED_FPC_SALT } from '@aztec/constants';
-import { SponsoredFPCContract } from '@aztec/noir-contracts.js/SponsoredFPC';
+import { SponsoredFPCContractArtifact } from '@aztec/noir-contracts.js/SponsoredFPC';
 import { EmbeddedWallet } from '@aztec/wallets/embedded';
 import { registerInitialLocalNetworkAccountsInWallet } from '@aztec/wallets/testing';
 import { randomBytes } from 'crypto';
@@ -79,12 +79,12 @@ export default class TrainingBenchmark extends Benchmark {
 
     const sponsoredFPCInstance =
       await getContractInstanceFromInstantiationParams(
-        SponsoredFPCContract.artifact,
+        SponsoredFPCContractArtifact,
         { salt: new Fr(SPONSORED_FPC_SALT) }
       );
     await wallet.registerContract(
       sponsoredFPCInstance,
-      SponsoredFPCContract.artifact
+      SponsoredFPCContractArtifact
     );
     const feePaymentMethod = new SponsoredFeePaymentMethod(
       sponsoredFPCInstance.address
@@ -94,7 +94,7 @@ export default class TrainingBenchmark extends Benchmark {
       new Fr(BigInt('0x' + randomBytes(32).toString('hex')) % FIELD_MODULUS);
 
     const deployOpts = (salt: Fr) => ({
-      from: AztecAddress.ZERO,
+      from: deployer,
       fee: { paymentMethod: feePaymentMethod },
       universalDeploy: true,
       skipInitialization: false,
@@ -104,12 +104,15 @@ export default class TrainingBenchmark extends Benchmark {
     // Deploy SingleLayer
     const singlePackedWeights = packToFields(getSingleLayerWeights(), 23, 28);
     const singlePackedBiases = packToFields(getSingleLayerBiases(), 1, 10);
-    const { contract: singleContract } = await SingleLayerContract.deployWithOpts(
-      { wallet, method: 'constructor_pretrained' },
-      singlePackedWeights,
-      singlePackedBiases
-    ).send(deployOpts(mkSalt()));
-    console.log(`SingleLayer deployed at: ${singleContract.address.toString()}`);
+    const { contract: singleContract } =
+      await SingleLayerContract.deployWithOpts(
+        { wallet, method: 'constructor_pretrained' },
+        singlePackedWeights,
+        singlePackedBiases
+      ).send(deployOpts(mkSalt()));
+    console.log(
+      `SingleLayer deployed at: ${singleContract.address.toString()}`
+    );
 
     const { result: singleWeightsRaw } = await singleContract.methods
       .get_all_packed_weights()
@@ -121,11 +124,12 @@ export default class TrainingBenchmark extends Benchmark {
     // Deploy MLP
     const mlpPackedWeights = packToFields(getMLPWeights(), 43, 28);
     const mlpPackedBiases = packToFields(getMLPBiases(), 1, 26);
-    const { contract: mlpContract } = await MultiLayerPerceptronContract.deployWithOpts(
-      { wallet, method: 'constructor_pretrained' },
-      mlpPackedWeights,
-      mlpPackedBiases
-    ).send(deployOpts(mkSalt()));
+    const { contract: mlpContract } =
+      await MultiLayerPerceptronContract.deployWithOpts(
+        { wallet, method: 'constructor_pretrained' },
+        mlpPackedWeights,
+        mlpPackedBiases
+      ).send(deployOpts(mkSalt()));
     console.log(`MLP deployed at: ${mlpContract.address.toString()}`);
 
     const { result: mlpWeightsRaw } = await mlpContract.methods
