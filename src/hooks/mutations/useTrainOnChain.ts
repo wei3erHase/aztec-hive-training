@@ -7,6 +7,7 @@
 import { useState, useCallback } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { EcdsaRAccountContract } from '@aztec/accounts/ecdsa/lazy';
+import { NO_FROM } from '@aztec/aztec.js/account';
 import type { AccountWithSecretKey } from '@aztec/aztec.js/account';
 import { AztecAddress } from '@aztec/aztec.js/addresses';
 import { getContractInstanceFromInstantiationParams } from '@aztec/aztec.js/contracts';
@@ -230,22 +231,32 @@ async function submitWithSDKWallet({
 
   const trainingAddress = AztecAddress.fromString(contractAddress);
 
-  // Always register the contract in the wallet extension's PXE so it can
-  // simulate and send transactions against it.  registerContract is idempotent
-  // — re-registering an already-known contract is a no-op.
-  // Note: the Wallet interface does NOT expose getContractInstance; use
-  // registerContract unconditionally instead of checking first.
   const aztecNode = createAztecNodeClient(nodeUrl);
-  const contractInstance = await aztecNode.getContract(trainingAddress);
-  if (contractInstance) {
-    await (
+
+  const registerInWallet = async (i: unknown, a: unknown) =>
+    (
       sdkWallet as {
         registerContract: (i: unknown, a: unknown) => Promise<void>;
       }
-    ).registerContract(contractInstance, ContractArtifact);
+    ).registerContract(i, a);
+
+  // Register the training contract in Azguard so it can prove submit_training_input.
+  const contractInstance = await aztecNode.getContract(trainingAddress);
+  if (contractInstance) {
+    await registerInWallet(contractInstance, ContractArtifact);
   }
 
-  const contract = ContractClass.at(trainingAddress, sdkWallet);
+  // Register the SponsoredFPC in Azguard so it can prove sponsor_unconditionally()
+  // which is embedded in every training transaction as the fee payment call.
+  const fpcInstance = await aztecNode.getContract(fpcAddress);
+  if (fpcInstance) {
+    try {
+      await registerInWallet(fpcInstance, SponsoredFPCContractArtifact);
+    } catch {
+      // FPC may have been compiled with a different aztec-nr version; Azguard
+      // may already have its artifact from its own bootstrap or a prior session.
+    }
+  }
 
   const toFr = (value: bigint) => {
     if (value < 0n) return new Fr(FIELD_MODULUS + value);
@@ -264,18 +275,31 @@ async function submitWithSDKWallet({
   const inputPixelsFr = data.inputPixels.map((p) => toFr(p));
   const labelFr = new Fr(data.label);
 
-  // get_all_packed_weights and get_packed_biases are public view functions
-  // (abi_public + abi_view). msg.sender is irrelevant for pure storage reads,
-  // so ZERO is used as the from address. Both calls are independent — run in
-  // parallel to halve the round-trip overhead.
+  // Fetch weights/biases via the local embedded PXE — NOT through Azguard.
+  // Routing a public view simulation through an external wallet triggers a
+  // private account-entrypoint execution whose PrivateExecutionResult now
+  // requires taggingIndexRanges (new in 4.2.0), which the wallet may not
+  // produce yet. The local PXE (fully 4.2.0) handles this correctly.
+  const pxeInstance = await SharedPXEService.getCurrentInstance(
+    nodeUrl,
+    networkId as 'local-network' | 'testnet'
+  );
+  if (contractInstance) {
+    await pxeInstance.wallet.registerContract(
+      contractInstance,
+      ContractArtifact
+    );
+  }
+  const localContract = ContractClass.at(
+    trainingAddress,
+    pxeInstance.wallet as Parameters<typeof ContractClass.at>[1]
+  );
   const [{ result: packedWeightsResult }, { result: packedBiasesResult }] =
     await Promise.all([
-      contract.methods
+      localContract.methods
         .get_all_packed_weights()
-        .simulate({ from: AztecAddress.ZERO }),
-      contract.methods
-        .get_packed_biases()
-        .simulate({ from: AztecAddress.ZERO }),
+        .simulate({ from: NO_FROM }),
+      localContract.methods.get_packed_biases().simulate({ from: NO_FROM }),
     ]);
 
   const currentPackedWeightsFr = (
@@ -289,6 +313,8 @@ async function submitWithSDKWallet({
       : [packedBiasesResult]
   ).map((b) => ensureFr(b));
 
+  // Submit the private training transaction through Azguard (sdkWallet).
+  const contract = ContractClass.at(trainingAddress, sdkWallet);
   const tx = contract.methods.submit_training_input(
     inputPixelsFr,
     labelFr,
@@ -296,29 +322,16 @@ async function submitWithSDKWallet({
     currentPackedBiasesFr
   );
 
-  const sendResult = await tx.send({
+  const { receipt } = await tx.send({
     from: accountAddress,
     fee: { paymentMethod },
     wait: { waitForStatus: TxStatus.PROPOSED, timeout: 120 },
   });
 
-  const rec =
-    (
-      sendResult as {
-        receipt?: {
-          txHash?: { toString?: () => string };
-          blockNumber?: number;
-        };
-      }
-    ).receipt ??
-    (sendResult as {
-      txHash?: { toString?: () => string };
-      blockNumber?: number;
-    });
   return {
     success: true,
-    txHash: rec.txHash?.toString?.(),
-    blockNumber: rec.blockNumber,
+    txHash: receipt.txHash?.toString?.(),
+    blockNumber: receipt.blockNumber,
   };
 }
 
@@ -436,16 +449,14 @@ async function submitWithEmbeddedWallet({
   const inputPixelsFr = data.inputPixels.map((p) => toFr(p));
   const labelFr = new Fr(data.label);
 
-  // Public view functions — msg.sender is irrelevant, ZERO is fine.
-  // Run both in parallel since they are independent storage reads.
+  // Public view functions — pure storage reads; use accountAddress so any
+  // wallet implementation (embedded or external) authorizes the simulate call.
   const [{ result: packedWeightsResult }, { result: packedBiasesResult }] =
     await Promise.all([
       contract.methods
         .get_all_packed_weights()
-        .simulate({ from: AztecAddress.ZERO }),
-      contract.methods
-        .get_packed_biases()
-        .simulate({ from: AztecAddress.ZERO }),
+        .simulate({ from: accountAddress }),
+      contract.methods.get_packed_biases().simulate({ from: accountAddress }),
     ]);
 
   const currentPackedWeightsFr = (
@@ -467,28 +478,15 @@ async function submitWithEmbeddedWallet({
   );
 
   // PROPOSED status confirms sequencer accepted the tx without waiting for proof
-  const sendResult = await tx.send({
+  const { receipt } = await tx.send({
     from: accountAddress,
     fee: { paymentMethod },
     wait: { waitForStatus: TxStatus.PROPOSED, timeout: 120 },
   });
 
-  const rec =
-    (
-      sendResult as {
-        receipt?: {
-          txHash?: { toString?: () => string };
-          blockNumber?: number;
-        };
-      }
-    ).receipt ??
-    (sendResult as {
-      txHash?: { toString?: () => string };
-      blockNumber?: number;
-    });
   return {
     success: true,
-    txHash: rec.txHash?.toString?.(),
-    blockNumber: rec.blockNumber,
+    txHash: receipt.txHash?.toString?.(),
+    blockNumber: receipt.blockNumber,
   };
 }
