@@ -5,3 +5,6 @@ type = "lib"
 authors = ["wei3erHase"]
 license = "MIT"
 compiler_version = ">=1.0.0"
+
+[dependencies]
+aztec = { git = "https://github.com/defi-wonderland/aztec-nr", tag = "v4.2.1-test.0", directory = "aztec" }

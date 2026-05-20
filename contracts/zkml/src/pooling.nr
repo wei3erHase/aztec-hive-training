@@ -4,15 +4,12 @@
 use crate::relu;
 use crate::softmax;
 
-global SCALING_FACTOR_U64: u64 = 1_000_000;
-global NEG_CHECK_THRESHOLD: u64 = 10_000_000_000_000;
-
 /// Signed integer division a / divisor for Field values.
-/// Uses the same NEG_CHECK_THRESHOLD sign-detection pattern as lib.nr.
+/// Uses the shared MAX_POSITIVE_PRODUCT sign-detection threshold from lib.
 fn signed_int_divide(a: Field, divisor: u64) -> Field {
     let neg_a = 0 - a;
     let neg_a_u64 = neg_a as u64;
-    if neg_a_u64 < NEG_CHECK_THRESHOLD {
+    if neg_a_u64 < crate::MAX_POSITIVE_PRODUCT {
         let abs_result = neg_a_u64 / divisor;
         0 - (abs_result as Field)
     } else {
@@ -104,9 +101,7 @@ pub fn gap_backward_relu_masked<let H: u32, let W: u32, let C: u32>(
         for h in 0..H {
             for w in 0..W {
                 let idx = (h * W + w) * C + c;
-                let neg_val = 0 - conv_out[idx];
-                let neg_val_u64 = neg_val as u64;
-                let relu_active = neg_val_u64 >= NEG_CHECK_THRESHOLD;
+                let relu_active = relu(conv_out[idx]) != 0;
                 if relu_active {
                     relu_grad[idx] = grad_per_position;
                 }

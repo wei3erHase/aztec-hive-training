@@ -1,6 +1,7 @@
 use crate::SingleLayer;
 use aztec::{protocol::address::AztecAddress, test::helpers::test_environment::TestEnvironment};
-use zkml::architectures::arch_64_10::{PACKED_BIAS_FIELDS, PACKED_WEIGHT_FIELDS, WEIGHTS_PER_FIELD};
+use zkml::architectures::arch_64_10::{PACKED_WEIGHT_FIELDS, WEIGHTS_PER_FIELD};
+use zkml::nn_trainer_template::NNTrainerTemplate;
 use zkml::packing;
 
 // Architecture: single-layer (64 -> 10)
@@ -62,7 +63,8 @@ pub unconstrained fn setup_contract_with_trained_weights() -> (&mut TestEnvironm
     let weights = create_trained_weights_single();
     let biases = create_trained_biases_single();
 
-    let mut packed_weights: [Field; PACKED_WEIGHT_FIELDS] = [0; PACKED_WEIGHT_FIELDS];
+    let mut packed_weights: [Field; NNTrainerTemplate::MAX_TRAINER_PACKED_WEIGHT_FIELDS] =
+        [0; NNTrainerTemplate::MAX_TRAINER_PACKED_WEIGHT_FIELDS];
     for packed_idx in 0..PACKED_WEIGHT_FIELDS {
         let mut weight_batch: [Field; WEIGHTS_PER_FIELD] = [0; WEIGHTS_PER_FIELD];
         let start_idx = packed_idx * WEIGHTS_PER_FIELD;
@@ -77,7 +79,8 @@ pub unconstrained fn setup_contract_with_trained_weights() -> (&mut TestEnvironm
         packed_weights[packed_idx] = packing::pack(weight_batch);
     }
 
-    let packed_biases_array: [Field; PACKED_BIAS_FIELDS] = [packing::pack(biases)];
+    let packed_biases_array: [Field; NNTrainerTemplate::MAX_TRAINER_PACKED_BIAS_FIELDS] =
+        [packing::pack(biases)];
 
     let initializer_call_interface =
         SingleLayer::interface().constructor_pretrained(packed_weights, packed_biases_array);

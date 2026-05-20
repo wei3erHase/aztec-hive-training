@@ -4,6 +4,7 @@
 // gas trade-off; yields CONV_OUT=75 with lower AVM cost than a 3x3 variant.
 
 use crate::conv;
+use crate::nn_trainer_template::{self, NNTrainerTemplate};
 use crate::packing;
 use crate::pooling;
 use crate::{relu, SCALING_FACTOR, signed_fixed_multiply};
@@ -11,6 +12,9 @@ use crate::softmax;
 
 pub global INPUT_SIZE: u32 = 64;
 pub global OUTPUT_SIZE: u32 = 10;
+pub global TRAINING_ARCHITECTURE_ID: u32 = 2;
+pub global TRAINING_LEARNING_RATE: Field = 50000;
+pub global TRAINING_REGULARIZATION: Field = 1000;
 
 // Conv layer dimensions: 8x8x1 -> 5x5x3 (kernel 4x4, padding 0, stride 1).
 pub global CONV_IN_H: u32 = 8;
@@ -172,17 +176,8 @@ pub fn compute_new_weights(
         gap_grad[c] = sum;
     }
 
-    let conv_relu_grad: [Field; CONV_OUT_SIZE] =
-        pooling::gap_backward::<CONV_OUT_H, CONV_OUT_W, CONV_C_OUT>(gap_grad);
-
-    // Apply ReLU mask: only positions where conv_out > 0 propagate gradients.
-    let mut conv_out_grad: [Field; CONV_OUT_SIZE] = [0; CONV_OUT_SIZE];
-    for i in 0..CONV_OUT_SIZE {
-        let relu_active = (0 - conv_out[i]) as u64 >= 10_000_000_000_000;
-        if relu_active {
-            conv_out_grad[i] = conv_relu_grad[i];
-        }
-    }
+    let conv_out_grad: [Field; CONV_OUT_SIZE] =
+        pooling::gap_backward_relu_masked::<CONV_OUT_H, CONV_OUT_W, CONV_C_OUT>(conv_out, gap_grad);
 
     let (_input_grad, conv_weight_grad, conv_bias_grad) = conv::conv2d_backward::<CONV_IN_H, CONV_IN_W, CONV_C_IN, CONV_C_OUT, CONV_K, CONV_P, CONV_S, CONV_OUT_H, CONV_OUT_W>(
         input_3d,
@@ -221,4 +216,56 @@ pub fn compute_new_weights(
     }
 
     NetworkWeights { weights: new_weights, biases: new_biases }
+}
+
+pub fn compute_forward_pass_trainer(
+    input_pixels: [Field; NNTrainerTemplate::MAX_TRAINER_INPUT_SIZE],
+    network_weights: [Field; NNTrainerTemplate::MAX_TRAINER_TOTAL_WEIGHTS],
+    network_biases: [Field; NNTrainerTemplate::MAX_TRAINER_TOTAL_BIASES],
+) -> [Field; NNTrainerTemplate::MAX_TRAINER_OUTPUT_SIZE] {
+    let arch_weights: [Field; TOTAL_WEIGHTS] = NNTrainerTemplate::nn_trainer_copy_prefix::<TOTAL_WEIGHTS, NNTrainerTemplate::MAX_TRAINER_TOTAL_WEIGHTS>(
+        network_weights,
+    );
+    let arch_biases: [Field; TOTAL_BIASES] = NNTrainerTemplate::nn_trainer_copy_prefix::<TOTAL_BIASES, NNTrainerTemplate::MAX_TRAINER_TOTAL_BIASES>(
+        network_biases,
+    );
+
+    let arch_network = NetworkWeights { weights: arch_weights, biases: arch_biases };
+
+    let arch_outputs = compute_forward_pass(input_pixels, arch_network);
+    NNTrainerTemplate::nn_trainer_copy_prefix::<NNTrainerTemplate::MAX_TRAINER_OUTPUT_SIZE, OUTPUT_SIZE>(
+        arch_outputs,
+    )
+}
+
+pub fn compute_new_weights_trainer(
+    input_pixels: [Field; NNTrainerTemplate::MAX_TRAINER_INPUT_SIZE],
+    label: Field,
+    old_network_weights: [Field; NNTrainerTemplate::MAX_TRAINER_TOTAL_WEIGHTS],
+    old_network_biases: [Field; NNTrainerTemplate::MAX_TRAINER_TOTAL_BIASES],
+    learning_rate: Field,
+    regularization: Field,
+    ) -> ([Field; NNTrainerTemplate::MAX_TRAINER_TOTAL_WEIGHTS], [Field; NNTrainerTemplate::MAX_TRAINER_TOTAL_BIASES]) {
+    let old_weights: [Field; TOTAL_WEIGHTS] = NNTrainerTemplate::nn_trainer_copy_prefix::<TOTAL_WEIGHTS, NNTrainerTemplate::MAX_TRAINER_TOTAL_WEIGHTS>(
+        old_network_weights,
+    );
+    let old_biases: [Field; TOTAL_BIASES] = NNTrainerTemplate::nn_trainer_copy_prefix::<TOTAL_BIASES, NNTrainerTemplate::MAX_TRAINER_TOTAL_BIASES>(
+        old_network_biases,
+    );
+
+    let old_arch_network = NetworkWeights { weights: old_weights, biases: old_biases };
+
+    let old_example = TrainingExample { image: input_pixels, label };
+
+    let new_network =
+        compute_new_weights(old_example, old_arch_network, learning_rate, regularization);
+
+    (
+        NNTrainerTemplate::nn_trainer_copy_prefix::<NNTrainerTemplate::MAX_TRAINER_TOTAL_WEIGHTS, TOTAL_WEIGHTS>(
+            new_network.weights,
+        ),
+        NNTrainerTemplate::nn_trainer_copy_prefix::<NNTrainerTemplate::MAX_TRAINER_TOTAL_BIASES, TOTAL_BIASES>(
+            new_network.biases,
+        ),
+    )
 }
