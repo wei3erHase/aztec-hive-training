@@ -180,6 +180,10 @@ Training on Aztec uses a **hash-commitment pattern** to prevent race conditions:
 
 This means the gradient computation is proven correct by the ZK circuit, and the public state update is atomic and replay-safe.
 
+### Aztec Templating Guide
+
+- [Templating Playbook](contracts/templating_skill.md): unified guide with templating practices and Aztec-NR migration-specific Do/Don’t.
+
 ### Neural Network Architectures
 
 | Contract | Architecture | Weights | Biases |
@@ -206,7 +210,7 @@ Weights are stored packed (9-bit, 28 values per Field) to minimise on-chain stor
 3. Select **FPC** in the "Pay fee with" dropdown
 4. Click **"Create New FPC"** and enter the Sponsored FPC address:
    ```
-   0x1586f476995be97f07ebd415340a14be48dc28c6c661cc6bdddb80ae790caa4e
+   0x08b888c4be63ed67f61a622fdd013ea028326bac22a8982a3b5a7e9ec62f765b
    ```
 
 ---

@@ -12,15 +12,13 @@ global POW_2_9: Field = 512; // 2^9
 // outside this range; overflowing 9 bits corrupts the packed Field (e.g. 266 -> -245).
 global QUANT_MAX: Field = 255;
 global QUANT_MIN: Field = 0 - 256;
-global NEG_CHECK_THRESHOLD: u64 = 10_000_000_000_000; // matches lib.nr
-
 /// Clamp v to [QUANT_MIN, QUANT_MAX] before packing to prevent 9-bit wrap-around.
 fn clamp_quantized(v: Field) -> Field {
     let neg_diff = 0 - (v - QUANT_MAX);
-    if (neg_diff as u64) < NEG_CHECK_THRESHOLD {
+    if (neg_diff as u64) < crate::MAX_POSITIVE_PRODUCT {
         // v - QUANT_MAX is negative => v < 255; check lower bound.
         let neg_sum = 0 - (v + OFFSET);
-        if (neg_sum as u64) < NEG_CHECK_THRESHOLD {
+        if (neg_sum as u64) < crate::MAX_POSITIVE_PRODUCT {
             QUANT_MIN
         } else {
             v
@@ -42,7 +40,7 @@ global HALF_WEIGHT_SCALE_U64: u64 = 976; // floor(WEIGHT_SCALE / 2), for round-t
 fn signed_round_divide(a: Field) -> Field {
     let neg_a = 0 - a;
     let neg_a_u64 = neg_a as u64;
-    if neg_a_u64 < NEG_CHECK_THRESHOLD {
+    if neg_a_u64 < crate::MAX_POSITIVE_PRODUCT {
         // a is negative
         let abs_result = (neg_a_u64 + HALF_WEIGHT_SCALE_U64) / WEIGHT_SCALE_U64;
         0 - (abs_result as Field)

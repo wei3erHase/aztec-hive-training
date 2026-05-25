@@ -1,11 +1,15 @@
 // Single-layer linear network: 64 inputs -> 10 outputs (no hidden layer, no activation).
 
+use crate::nn_trainer_template::{self, NNTrainerTemplate};
 use crate::packing;
 use crate::{SCALING_FACTOR, signed_fixed_multiply};
 use crate::softmax;
 
 pub global INPUT_SIZE: u32 = 64;
 pub global OUTPUT_SIZE: u32 = 10;
+pub global TRAINING_ARCHITECTURE_ID: u32 = 0;
+pub global TRAINING_LEARNING_RATE: Field = 5000;
+pub global TRAINING_REGULARIZATION: Field = 1000;
 pub global TOTAL_WEIGHTS: u32 = 640; // 64 * 10
 pub global TOTAL_BIASES: u32 = 10;
 
@@ -128,4 +132,51 @@ pub fn compute_forward_pass(
     }
 
     outputs
+}
+
+pub fn compute_forward_pass_trainer(
+    input_pixels: [Field; NNTrainerTemplate::MAX_TRAINER_INPUT_SIZE],
+    network_weights: [Field; NNTrainerTemplate::MAX_TRAINER_TOTAL_WEIGHTS],
+    network_biases: [Field; NNTrainerTemplate::MAX_TRAINER_TOTAL_BIASES],
+) -> [Field; NNTrainerTemplate::MAX_TRAINER_OUTPUT_SIZE] {
+    let arch_weights: [Field; TOTAL_WEIGHTS] = NNTrainerTemplate::nn_trainer_copy_prefix::<TOTAL_WEIGHTS, NNTrainerTemplate::MAX_TRAINER_TOTAL_WEIGHTS>(
+        network_weights,
+    );
+    let arch_biases: [Field; TOTAL_BIASES] = NNTrainerTemplate::nn_trainer_copy_prefix::<TOTAL_BIASES, NNTrainerTemplate::MAX_TRAINER_TOTAL_BIASES>(
+        network_biases,
+    );
+    let arch_network = NetworkWeights { weights: arch_weights, biases: arch_biases };
+    let arch_outputs = compute_forward_pass(input_pixels, arch_network);
+    NNTrainerTemplate::nn_trainer_copy_prefix::<NNTrainerTemplate::MAX_TRAINER_OUTPUT_SIZE, OUTPUT_SIZE>(
+        arch_outputs,
+    )
+}
+
+pub fn compute_new_weights_trainer(
+    input_pixels: [Field; NNTrainerTemplate::MAX_TRAINER_INPUT_SIZE],
+    label: Field,
+    old_network_weights: [Field; NNTrainerTemplate::MAX_TRAINER_TOTAL_WEIGHTS],
+    old_network_biases: [Field; NNTrainerTemplate::MAX_TRAINER_TOTAL_BIASES],
+    learning_rate: Field,
+    regularization: Field,
+    ) -> ([Field; NNTrainerTemplate::MAX_TRAINER_TOTAL_WEIGHTS], [Field; NNTrainerTemplate::MAX_TRAINER_TOTAL_BIASES]) {
+    let arch_weights: [Field; TOTAL_WEIGHTS] = NNTrainerTemplate::nn_trainer_copy_prefix::<TOTAL_WEIGHTS, NNTrainerTemplate::MAX_TRAINER_TOTAL_WEIGHTS>(
+        old_network_weights,
+    );
+    let arch_biases: [Field; TOTAL_BIASES] = NNTrainerTemplate::nn_trainer_copy_prefix::<TOTAL_BIASES, NNTrainerTemplate::MAX_TRAINER_TOTAL_BIASES>(
+        old_network_biases,
+    );
+    let old_arch_network = NetworkWeights { weights: arch_weights, biases: arch_biases };
+    let old_example = TrainingExample { image: input_pixels, label };
+
+    let new_network =
+        compute_new_weights(old_example, old_arch_network, learning_rate, regularization);
+    (
+        NNTrainerTemplate::nn_trainer_copy_prefix::<NNTrainerTemplate::MAX_TRAINER_TOTAL_WEIGHTS, TOTAL_WEIGHTS>(
+            new_network.weights,
+        ),
+        NNTrainerTemplate::nn_trainer_copy_prefix::<NNTrainerTemplate::MAX_TRAINER_TOTAL_BIASES, TOTAL_BIASES>(
+            new_network.biases,
+        ),
+    )
 }

@@ -220,8 +220,9 @@ export default defineConfig(() => {
     },
     resolve: {
       alias: {
-        // Ensure artifact JSON imports resolve from src/artifacts
-        '../target': path.resolve(__dirname, 'src/target'),
+        // Artifact JSON lives next to compile output (repo root target/)
+        '../target': path.resolve(__dirname, 'target'),
+        '../../target': path.resolve(__dirname, 'target'),
         // Additional polyfills for blockchain dependencies
         crypto: 'crypto-browserify',
         stream: 'stream-browserify',

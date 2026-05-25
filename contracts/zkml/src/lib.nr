@@ -16,6 +16,7 @@ pub mod packing;
 pub mod conv;
 pub mod pooling;
 pub mod hash;
+pub mod nn_trainer_template;
 pub mod architectures;
 pub mod test;
 
@@ -27,7 +28,7 @@ global SCALING_FACTOR_U64: u64 = 1000000;
 // (0 - value) as u64 falls below this bound.
 // Chosen to exceed the largest positive product we ever compute:
 // max_pixel (~1M) * max_weight (~256M fixed-point) ~= 2.56e14 < 10^13 after scaling.
-global MAX_POSITIVE_PRODUCT: u64 = 10_000_000_000_000;
+pub global MAX_POSITIVE_PRODUCT: u64 = 10_000_000_000_000;
 
 /// Signed fixed-point multiplication: (a * b) / SCALING_FACTOR.
 /// Field arithmetic wraps correctly for signed operands; sign is detected

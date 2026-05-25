@@ -21,60 +21,84 @@ function tryRun(cmd: string, opts: Record<string, unknown> = {}): boolean {
 }
 
 /**
- * Ensure a directory exists
+ * Aztec stack version from package.json (no CLI required; safe for CI/local).
  */
-function ensureDir(p: string): void {
-  fs.mkdirSync(p, { recursive: true });
+function getAztecStackVersion(projectRoot: string): string {
+  const pkg = JSON.parse(
+    fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8')
+  ) as {
+    config?: { aztecVersion?: string };
+    dependencies?: Record<string, string>;
+  };
+  return (
+    pkg.config?.aztecVersion ??
+    pkg.dependencies?.['@aztec/aztec.js'] ??
+    'unknown'
+  );
+}
+
+/** True when artifacts exist but were never postprocessed (e.g. raw `nargo compile`). */
+function artifactsNeedPostprocess(targetDir: string): boolean {
+  if (!fs.existsSync(targetDir)) {
+    return false;
+  }
+
+  const jsonFiles = fs
+    .readdirSync(targetDir)
+    .filter((f) => f.endsWith('.json') && !f.endsWith('.bak'));
+
+  if (jsonFiles.length === 0) {
+    return false;
+  }
+
+  return jsonFiles.some((file) => {
+    const artifact = JSON.parse(
+      fs.readFileSync(path.join(targetDir, file), 'utf8')
+    ) as { transpiled?: boolean };
+    return artifact.transpiled !== true;
+  });
+}
+
+/** Remove contract JSONs so `aztec compile` cannot skip postprocess/transpile. */
+function clearContractArtifacts(targetDir: string): void {
+  if (!fs.existsSync(targetDir)) {
+    return;
+  }
+
+  for (const file of fs.readdirSync(targetDir)) {
+    if (file.endsWith('.json') && !file.endsWith('.bak')) {
+      fs.unlinkSync(path.join(targetDir, file));
+      console.log(`   🗑️ Removed stale artifact ${file}`);
+    }
+  }
 }
 
 /**
- * Copy files with optional filter
+ * Stamp `aztec_version` when compile skipped stamping (fallback only).
  */
-function copyFiles(
-  sourceDir: string,
-  targetDir: string,
-  forceOverwrite = false,
-  filter?: (file: string) => boolean
-): number {
-  if (!fs.existsSync(sourceDir)) {
-    console.log(`⚠️ Source directory ${sourceDir} does not exist`);
-    return 0;
+function stampAztecVersion(targetDir: string, version: string): void {
+  if (!fs.existsSync(targetDir)) {
+    return;
   }
 
-  ensureDir(targetDir);
-  const files = fs.readdirSync(sourceDir);
-  let copiedCount = 0;
-  let skippedCount = 0;
+  const jsonFiles = fs
+    .readdirSync(targetDir)
+    .filter((f) => f.endsWith('.json') && !f.endsWith('.bak'));
 
-  for (const file of files) {
-    // Apply filter if provided
-    if (filter && !filter(file)) {
+  for (const file of jsonFiles) {
+    const filePath = path.join(targetDir, file);
+    const artifact = JSON.parse(fs.readFileSync(filePath, 'utf8')) as {
+      aztec_version?: string;
+    };
+
+    if (artifact.aztec_version === version) {
       continue;
     }
 
-    const srcPath = path.join(sourceDir, file);
-    const dstPath = path.join(targetDir, file);
-
-    if (fs.existsSync(dstPath) && !forceOverwrite) {
-      console.log(`   ⏭️ Skipping ${file} (already exists)`);
-      skippedCount++;
-      continue;
-    }
-
-    // Overwrite or copy new
-    if (fs.statSync(srcPath).isDirectory()) {
-      fs.cpSync(srcPath, dstPath, { recursive: true, force: true });
-    } else {
-      fs.copyFileSync(srcPath, dstPath);
-    }
-    console.log(`   ✅ Copied ${file}`);
-    copiedCount++;
+    artifact.aztec_version = version;
+    fs.writeFileSync(filePath, `${JSON.stringify(artifact, null, 2)}\n`);
+    console.log(`   🏷️ Stamped aztec_version=${version} in ${file}`);
   }
-
-  console.log(
-    `   📊 Copied ${copiedCount} items, skipped ${skippedCount} existing items`
-  );
-  return copiedCount;
 }
 
 /**
@@ -113,10 +137,7 @@ function stripAztecNrPrefix(targetDir: string): void {
 /**
  * Compile local contracts using workspace Nargo.toml at root level
  */
-function compileLocalContracts(
-  projectRoot: string,
-  forceOverwrite: boolean
-): boolean {
+function compileLocalContracts(projectRoot: string): boolean {
   const workspaceNargo = path.join(projectRoot, 'Nargo.toml');
 
   if (!fs.existsSync(workspaceNargo)) {
@@ -124,12 +145,25 @@ function compileLocalContracts(
     return false;
   }
 
-  console.log('\n🔨 Compiling contracts from workspace...');
-
-  // Compile all contracts from workspace root
-  // Note: In v4, nargo is installed directly via aztec-up.
-  tryRun(`cd "${projectRoot}" && nargo compile`);
+  const forceRebuild = process.argv.includes('--force');
   const compiledTarget = path.join(projectRoot, 'target');
+
+  if (forceRebuild || artifactsNeedPostprocess(compiledTarget)) {
+    if (artifactsNeedPostprocess(compiledTarget)) {
+      console.log(
+        '   ⚠️ Found non-transpiled artifacts (likely from nargo only); clearing for postprocess...'
+      );
+    }
+    clearContractArtifacts(compiledTarget);
+  }
+
+  console.log('\n🔨 Compiling contracts (aztec compile, same as CI)...');
+
+  if (!tryRun(`cd "${projectRoot}" && aztec compile`)) {
+    console.error('   ❌ Failed to compile contracts');
+    return false;
+  }
+
   const hasArtifacts =
     fs.existsSync(compiledTarget) &&
     fs.readdirSync(compiledTarget).some((f) => f.endsWith('.json'));
@@ -140,65 +174,30 @@ function compileLocalContracts(
 
   console.log('   ✅ Contracts compiled successfully');
 
-  // Postprocess: transpile public bytecode (ACIR → AVM) and generate VKs.
-  // In v4, `aztec-nargo compile` only produces raw ACIR. `bb aztec_process`
-  // transpiles public functions and sets `transpiled: true` in the JSON,
-  // which `aztec codegen` requires.
-  console.log('   🔧 Postprocessing contracts (transpile + VK generation)...');
-  {
-    // Use local bb binary from aztec-up installation
-    const bbCmd = [
-      `cd "${projectRoot}"`,
-      `&& for f in target/*.json; do flags="$flags -i $f"; done;`,
-      `bb aztec_process $flags`,
-    ].join(' ');
-    if (!tryRun(bbCmd)) {
-      console.error('   ❌ Failed to postprocess contracts');
-      return false;
-    }
-  }
-  console.log('   ✅ Contracts postprocessed successfully');
-
   // Strip __aztec_nr_internals__ prefix from function names
   stripAztecNrPrefix(compiledTarget);
 
-  // Copy artifacts from target/ to src/target/ (for codegen) and src/artifacts/
+  // Fallback when compile output omits aztec_version (e.g. skipped recompile)
+  stampAztecVersion(compiledTarget, getAztecStackVersion(projectRoot));
+
   const targetDir = path.join(projectRoot, 'target');
-  const artifactsDir = path.join(projectRoot, ARTIFACTS_OUTPUT_DIR);
-  const srcTargetDir = path.join(projectRoot, 'src', 'target');
 
-  if (fs.existsSync(targetDir)) {
-    copyFiles(
-      targetDir,
-      artifactsDir,
-      forceOverwrite,
-      (file) => file.endsWith('.json') && !file.endsWith('.bak')
-    );
-    copyFiles(
-      targetDir,
-      srcTargetDir,
-      forceOverwrite,
-      (file) => file.endsWith('.json') && !file.endsWith('.bak')
-    );
-  }
-
-  // Run codegen to generate TypeScript wrappers from JSON
+  // Run codegen to generate TypeScript wrappers from JSON (same paths as CI)
   console.log('   🔧 Generating TypeScript artifacts...');
   if (
     !tryRun(
-      `cd "${projectRoot}" && aztec codegen src/target --outdir src/artifacts -f`
+      `cd "${projectRoot}" && aztec codegen target --outdir src/artifacts -f`
     )
   ) {
-    console.warn('   ⚠️ Codegen failed - TS artifacts may be stale');
-  } else {
-    console.log('   ✅ TypeScript artifacts generated');
+    console.error('   ❌ Codegen failed');
+    return false;
   }
 
+  console.log('   ✅ TypeScript artifacts generated');
   return true;
 }
 
 async function main() {
-  const forceOverwrite = process.argv.includes('--force');
   const projectRoot = process.cwd();
 
   console.log(`
@@ -213,12 +212,12 @@ async function main() {
     console.log('📦 Compile local contracts');
     console.log('='.repeat(60));
 
-    const ok = compileLocalContracts(projectRoot, forceOverwrite);
-    if (ok) {
-      console.log('\n✅ Build contracts step completed');
-    } else {
-      console.warn('\n⚠️ Some local contracts failed to compile');
+    const ok = compileLocalContracts(projectRoot);
+    if (!ok) {
+      console.error('\n❌ Build contracts failed');
+      process.exit(1);
     }
+    console.log('\n✅ Build contracts step completed');
 
     console.log('\n' + '='.repeat(60));
     console.log('🎉 Build complete!');

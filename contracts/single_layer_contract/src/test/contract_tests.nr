@@ -120,10 +120,13 @@ unconstrained fn test_train_step_packed_structure() {
     let packed_biases = env.view_public(SingleLayer::at(contract_address).get_packed_biases());
 
     assert(
-        packed_weights.len() == 23,
-        "PACKED_WEIGHT_FIELDS should be 23 for submit_training_input",
+        packed_weights.len() == 43,
+        "get_all_packed_weights returns MAX_TRAINER_PACKED_WEIGHT_FIELDS (43) for all architectures",
     );
-    assert(packed_biases.len() == 1, "PACKED_BIAS_FIELDS should be 1 for submit_training_input");
+    assert(
+        packed_biases.len() == 1,
+        "get_packed_biases returns MAX_TRAINER_PACKED_BIAS_FIELDS (1) for all architectures",
+    );
 }
 
 #[test]

@@ -3,21 +3,13 @@
 // Uses u64 for Taylor-series arithmetic to get truncating integer division;
 // results are cast to Field only at the final output step.
 
-global SCALING_FACTOR: Field = 1_000_000;
-pub global SF_U64: u64 = 1_000_000;
-
-// Logit sums are typically in [-10M, +10M] fixed-point units; 10^11 safely
-// exceeds the largest positive logit we expect, so values below this threshold
-// are treated as negative when cast from Field.
-global MAX_POSITIVE_LOGIT: u64 = 100_000_000_000;
-
 /// Returns true if val encodes a negative signed integer.
 /// Negative values wrap to p - |val| in the field; (0 - val) as u64 will
-/// therefore be small (below MAX_POSITIVE_LOGIT) for negative inputs.
+/// therefore be small (below the shared sign-detection threshold) for negative inputs.
 fn is_negative_field(val: Field) -> bool {
     let neg_val = 0 - val;
     let neg_as_u64 = neg_val as u64;
-    neg_as_u64 < MAX_POSITIVE_LOGIT
+    neg_as_u64 < crate::MAX_POSITIVE_PRODUCT
 }
 
 /// Signed greater-than comparison for Field values: returns true if a > b.
@@ -89,7 +81,7 @@ global EXP_NEG_5: u64 = 7_000; // exp(-5) ~= 0.007
 /// the precomputed EXP_NEG_N constants are multiplied by a local Taylor term.
 pub fn exp_approx(raw_diff: Field) -> Field {
     let raw_diff_u64 = raw_diff as u64;
-    let sf = SF_U64;
+    let sf = crate::SCALING_FACTOR as u64;
 
     let result_u64 = if raw_diff_u64 == 0 {
         sf
@@ -215,7 +207,7 @@ pub fn find_max_logit<let N: u32>(logits: [Field; N]) -> Field {
 
 /// Softmax over N logits. Returns probabilities scaled by SCALING_FACTOR (sum ~= 1,000,000).
 pub fn softmax<let N: u32>(logits: [Field; N]) -> [Field; N] {
-    let sf = SCALING_FACTOR;
+    let sf = crate::SCALING_FACTOR;
     let max_logit = find_max_logit(logits);
 
     let mut exp_outputs: [Field; N] = [0; N];
@@ -235,7 +227,7 @@ pub fn softmax<let N: u32>(logits: [Field; N]) -> [Field; N] {
 
     // Probability computation in u64 to get truncating integer division.
     let sum_exp_u64 = sum_exp_safe as u64;
-    let sf_u64 = SF_U64;
+    let sf_u64 = crate::SCALING_FACTOR_U64;
 
     let mut probabilities: [Field; N] = [0; N];
     for i in 0..N {
@@ -250,7 +242,7 @@ pub fn softmax<let N: u32>(logits: [Field; N]) -> [Field; N] {
 
 /// Softmax variant that also returns the raw exp values and their sum, needed for confidence scoring.
 pub fn softmax_with_exp<let N: u32>(logits: [Field; N]) -> ([Field; N], Field, [Field; N]) {
-    let sf = SCALING_FACTOR;
+    let sf = crate::SCALING_FACTOR;
     let max_logit = find_max_logit(logits);
 
     let mut exp_outputs: [Field; N] = [0; N];
@@ -268,7 +260,7 @@ pub fn softmax_with_exp<let N: u32>(logits: [Field; N]) -> ([Field; N], Field, [
     let sum_exp_safe = if sum_exp.lt(sf) { sf } else { sum_exp };
 
     let sum_exp_u64 = sum_exp_safe as u64;
-    let sf_u64 = SF_U64;
+    let sf_u64 = crate::SCALING_FACTOR_U64;
 
     let mut probabilities: [Field; N] = [0; N];
     for i in 0..N {
@@ -308,13 +300,13 @@ pub fn compute_confidence<let N: u32>(
     let sum_exp_u64 = sum_exp_safe as u64;
 
     let confidence_u64 = if exp_max_u64 > sum_exp_u64 {
-        SF_U64
+        crate::SCALING_FACTOR_U64
     } else {
-        (exp_max_u64 * SF_U64) / sum_exp_u64
+        (exp_max_u64 * crate::SCALING_FACTOR_U64) / sum_exp_u64
     };
 
-    let confidence_clamped = if confidence_u64 > SF_U64 {
-        SF_U64
+    let confidence_clamped = if confidence_u64 > crate::SCALING_FACTOR_U64 {
+        crate::SCALING_FACTOR_U64
     } else {
         confidence_u64
     };

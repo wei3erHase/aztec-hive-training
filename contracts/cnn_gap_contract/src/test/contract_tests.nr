@@ -30,10 +30,16 @@ unconstrained fn test_deploy_storage_reads() {
     assert(bias_0 == 0, "First bias should be zero");
 
     let packed_weights = env.view_public(CNNGAP::at(contract_address).get_all_packed_weights());
-    assert(packed_weights.len() == 3, "Should return 3 packed weight fields (3ch 4x4 CNN)");
+    assert(
+        packed_weights.len() == 43,
+        "get_all_packed_weights returns MAX_TRAINER_PACKED_WEIGHT_FIELDS (43) for all architectures",
+    );
 
     let packed_biases = env.view_public(CNNGAP::at(contract_address).get_packed_biases());
-    assert(packed_biases.len() == 1, "Should return 1 packed bias field");
+    assert(
+        packed_biases.len() == 1,
+        "get_packed_biases returns MAX_TRAINER_PACKED_BIAS_FIELDS (1) for all architectures",
+    );
 }
 
 // predict/predict_all may exceed local network gas limit (6M). Test via JS: tests/app/architectures-flow.test.ts

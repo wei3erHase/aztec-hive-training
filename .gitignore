@@ -31,7 +31,6 @@ config/deployed.local.json
 .deploy-store
 contracts/target
 target/
-src/target/
 src/artifacts/
 artifacts/
 codegenCache.json

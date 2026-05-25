@@ -15,7 +15,6 @@ export default tseslint.config(
     ignores: [
       'dist',
       'src/artifacts/**',
-      'src/target/**',
       '**/eslint.config.js',
     ],
   },

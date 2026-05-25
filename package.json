@@ -7,17 +7,17 @@
     "node": ">=22.0.0"
   },
   "scripts": {
-    "clean": "rm -rf dist src/target src/artifacts/*.json src/artifacts/*.js src/artifacts/*.d.ts contracts/*/target target",
-    "build:contracts": "aztec compile && mkdir -p src/target && cp target/*.json src/target/",
-    "codegen": "aztec codegen src/target --outdir src/artifacts -f",
+    "clean": "rm -rf dist src/artifacts/*.json src/artifacts/*.js src/artifacts/*.d.ts contracts/*/target target",
+    "build:contracts": "aztec compile && yarn codegen",
+    "codegen": "aztec codegen target --outdir src/artifacts -f",
     "build:local": "yarn build-contracts && yarn build-app",
     "build": "yarn build-contracts && yarn build-app",
-    "build-contracts": "tsx scripts/build-contracts.ts --force",
+    "build-contracts": "tsx scripts/build-contracts.ts",
     "build:ci": "yarn build-app:ci",
     "deploy-contracts": "tsx scripts/deploy.ts",
     "deploy-contracts:local-network": "tsx scripts/deploy.ts --network=local-network",
-    "deploy-contracts:testnet": "tsx --env-file=.env scripts/deploy.ts --network=testnet",
-    "deploy-contracts:all": "tsx --env-file=.env scripts/deploy.ts --network=all",
+    "deploy-contracts:testnet": "tsx scripts/deploy.ts --network=testnet",
+    "deploy-contracts:all": "tsx scripts/deploy.ts --network=all",
     "benchmark": "aztec-benchmark --output-dir ./benchmarks",
     "dev": "vite",
     "build-app": "NODE_OPTIONS='--max-old-space-size=6144' vite build",
@@ -39,17 +39,17 @@
     "prepare": "husky"
   },
   "dependencies": {
-    "@aztec/accounts": "4.2.0-aztecnr-rc.2",
-    "@aztec/aztec.js": "4.2.0-aztecnr-rc.2",
-    "@aztec/constants": "4.2.0-aztecnr-rc.2",
-    "@aztec/foundation": "4.2.0-aztecnr-rc.2",
-    "@aztec/kv-store": "4.2.0-aztecnr-rc.2",
-    "@aztec/noir-contracts.js": "4.2.0-aztecnr-rc.2",
-    "@aztec/pxe": "4.2.0-aztecnr-rc.2",
-    "@aztec/stdlib": "4.2.0-aztecnr-rc.2",
-    "@aztec/wallet-sdk": "4.2.0-aztecnr-rc.2",
-    "@aztec/wallets": "4.2.0-aztecnr-rc.2",
-    "@defi-wonderland/aztec-benchmark": "4.2.0-aztecnr-rc.2",
+    "@aztec/accounts": "4.3.0",
+    "@aztec/aztec.js": "4.3.0",
+    "@aztec/constants": "4.3.0",
+    "@aztec/foundation": "4.3.0",
+    "@aztec/kv-store": "4.3.0",
+    "@aztec/noir-contracts.js": "4.3.0",
+    "@aztec/pxe": "4.3.0",
+    "@aztec/stdlib": "4.3.0",
+    "@aztec/wallet-sdk": "4.3.0",
+    "@aztec/wallets": "4.3.0",
+    "@defi-wonderland/aztec-benchmark": "4.3.0",
     "@radix-ui/react-dialog": "1.1.15",
     "@radix-ui/react-select": "2.2.6",
     "@radix-ui/react-slot": "1.2.4",
@@ -120,7 +120,7 @@
     "trailingComma": "es5"
   },
   "config": {
-    "aztecVersion": "4.2.0-aztecnr-rc.2"
+    "aztecVersion": "4.3.0"
   },
   "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e",
   "resolutions": {

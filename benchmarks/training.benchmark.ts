@@ -21,7 +21,11 @@ import {
   getCNNWeights,
   getCNNBiases,
 } from '../scripts/pretrained-weights.js';
-import { packToFields } from '../scripts/weight-packing.js';
+import {
+  packToFields,
+  MAX_TRAINER_PACKED_BIAS_FIELDS,
+  MAX_TRAINER_PACKED_WEIGHT_FIELDS,
+} from '../scripts/weight-packing.js';
 import { CNNGAPContract } from '../src/artifacts/CNNGAP.js';
 import { MultiLayerPerceptronContract } from '../src/artifacts/MultiLayerPerceptron.js';
 import { SingleLayerContract } from '../src/artifacts/SingleLayer.js';
@@ -102,8 +106,15 @@ export default class TrainingBenchmark extends Benchmark {
     });
 
     // Deploy SingleLayer
-    const singlePackedWeights = packToFields(getSingleLayerWeights(), 23, 28);
-    const singlePackedBiases = packToFields(getSingleLayerBiases(), 1, 10);
+    const singlePackedWeights = packToFields(
+      getSingleLayerWeights(),
+      MAX_TRAINER_PACKED_WEIGHT_FIELDS
+    );
+    const singlePackedBiases = packToFields(
+      getSingleLayerBiases(),
+      MAX_TRAINER_PACKED_BIAS_FIELDS,
+      10
+    );
     const { contract: singleContract } =
       await SingleLayerContract.deployWithOpts(
         { wallet, method: 'constructor_pretrained' },
@@ -122,8 +133,15 @@ export default class TrainingBenchmark extends Benchmark {
       .simulate({ from: deployer });
 
     // Deploy MLP
-    const mlpPackedWeights = packToFields(getMLPWeights(), 43, 28);
-    const mlpPackedBiases = packToFields(getMLPBiases(), 1, 26);
+    const mlpPackedWeights = packToFields(
+      getMLPWeights(),
+      MAX_TRAINER_PACKED_WEIGHT_FIELDS
+    );
+    const mlpPackedBiases = packToFields(
+      getMLPBiases(),
+      MAX_TRAINER_PACKED_BIAS_FIELDS,
+      26
+    );
     const { contract: mlpContract } =
       await MultiLayerPerceptronContract.deployWithOpts(
         { wallet, method: 'constructor_pretrained' },
@@ -140,8 +158,15 @@ export default class TrainingBenchmark extends Benchmark {
       .simulate({ from: deployer });
 
     // Deploy CNNGAP
-    const cnnPackedWeights = packToFields(getCNNWeights(), 3, 28);
-    const cnnPackedBiases = packToFields(getCNNBiases(), 1, 28);
+    const cnnPackedWeights = packToFields(
+      getCNNWeights(),
+      MAX_TRAINER_PACKED_WEIGHT_FIELDS
+    );
+    const cnnPackedBiases = packToFields(
+      getCNNBiases(),
+      MAX_TRAINER_PACKED_BIAS_FIELDS,
+      28
+    );
     const { contract: cnnContract } = await CNNGAPContract.deployWithOpts(
       { wallet, method: 'constructor_pretrained' },
       cnnPackedWeights,

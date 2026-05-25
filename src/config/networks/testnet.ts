@@ -1,4 +1,5 @@
 import { AztecAddress } from '@aztec/stdlib/aztec-address';
+import { SPONSORED_FPC_CANONICAL_ADDRESS } from './sponsoredFpc';
 import { NetworkConfig } from './types';
 
 /**
@@ -16,6 +17,5 @@ export const TESTNET_CONFIG: NetworkConfig = {
   deployerAddress: AztecAddress.ZERO.toString(),
   proverEnabled: true,
   isTestnet: true,
-  sponsoredFpcAddress:
-    '0x1e2e59ede08460bf957ab1a349d64d84ff8ffecc03528bd6e111c608a2ba2c6c',
+  sponsoredFpcAddress: SPONSORED_FPC_CANONICAL_ADDRESS,
 };
