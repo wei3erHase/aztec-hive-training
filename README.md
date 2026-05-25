@@ -210,7 +210,7 @@ Weights are stored packed (9-bit, 28 values per Field) to minimise on-chain stor
 3. Select **FPC** in the "Pay fee with" dropdown
 4. Click **"Create New FPC"** and enter the Sponsored FPC address:
    ```
-   0x1586f476995be97f07ebd415340a14be48dc28c6c661cc6bdddb80ae790caa4e
+   0x08b888c4be63ed67f61a622fdd013ea028326bac22a8982a3b5a7e9ec62f765b
    ```
 
 ---

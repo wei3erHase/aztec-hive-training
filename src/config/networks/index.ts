@@ -1,6 +1,7 @@
 export * from './types';
 export * from './constants';
 export * from './local-network';
+export * from './sponsoredFpc';
 export * from './testnet';
 
 import { LOCAL_NETWORK_CONFIG } from './local-network';
