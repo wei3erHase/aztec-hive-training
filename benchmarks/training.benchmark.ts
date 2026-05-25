@@ -21,7 +21,11 @@ import {
   getCNNWeights,
   getCNNBiases,
 } from '../scripts/pretrained-weights.js';
-import { packToFields } from '../scripts/weight-packing.js';
+import {
+  packToFields,
+  MAX_TRAINER_PACKED_BIAS_FIELDS,
+  MAX_TRAINER_PACKED_WEIGHT_FIELDS,
+} from '../scripts/weight-packing.js';
 import { CNNGAPContract } from '../src/artifacts/CNNGAP.js';
 import { MultiLayerPerceptronContract } from '../src/artifacts/MultiLayerPerceptron.js';
 import { SingleLayerContract } from '../src/artifacts/SingleLayer.js';
@@ -30,8 +34,6 @@ import { FIELD_MODULUS } from '../src/utils/zkml.js';
 // Contract constants
 const SCALING_FACTOR = 1_000_000;
 const INPUT_SIZE = 64;
-const MAX_TRAINER_PACKED_WEIGHT_FIELDS = 43;
-const MAX_TRAINER_PACKED_BIAS_FIELDS = 1;
 
 interface TrainingArchitecture {
   contract: SingleLayerContract | MultiLayerPerceptronContract | CNNGAPContract;

@@ -11,6 +11,10 @@ const MASK_9_BITS = 511n;
 const POW_2_9 = 512n;
 const VALUES_PER_FIELD = 28;
 
+/** Shared nn_trainer_template storage layout (all host contracts). */
+export const MAX_TRAINER_PACKED_WEIGHT_FIELDS = 43;
+export const MAX_TRAINER_PACKED_BIAS_FIELDS = 1;
+
 function clampQuantized(v: number): number {
   if (v > 255) return 255;
   if (v < -256) return -256;

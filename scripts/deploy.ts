@@ -10,7 +10,7 @@
  *
  * Prerequisites:
  *   - Local network: run `aztec start --local-network` on port 8080
- *   - Testnet: SPONSOR_FPC_ADDRESS or SPONSOR_FPC_SALT env var must be set
+ *   - Testnet: uses SPONSOR_FPC_ADDRESS from `.env` (or canonical genesis FPC as fallback)
  *   - Contracts must be built: yarn build-contracts
  */
 
@@ -38,7 +38,8 @@ import {
   getCNNWeights,
   getCNNBiases,
 } from './pretrained-weights.js';
-import { packToFields } from './weight-packing.js';
+import { packToFields, MAX_TRAINER_PACKED_BIAS_FIELDS, MAX_TRAINER_PACKED_WEIGHT_FIELDS } from './weight-packing.js';
+import { SPONSORED_FPC_CANONICAL_ADDRESS } from '../src/config/networks/sponsoredFpc.js';
 
 const NETWORK_URLS: Record<string, string> = {
   'local-network': 'http://localhost:8080',
@@ -46,9 +47,8 @@ const NETWORK_URLS: Record<string, string> = {
 };
 
 /**
- * Load project `.env` when present so bare `yarn deploy-contracts` and
- * `yarn deploy-contracts --network=all` pick up `SPONSOR_FPC_*` without
- * requiring `tsx --env-file=.env`. Does not override existing env vars.
+ * Load project `.env` when present. Values from `.env` override any existing
+ * process env (including Node's `--env-file`), so local `.env` is authoritative.
  */
 function loadOptionalDotEnv(): void {
   const envPath = path.join(process.cwd(), '.env');
@@ -68,9 +68,7 @@ function loadOptionalDotEnv(): void {
     ) {
       value = value.slice(1, -1);
     }
-    if (process.env[key] === undefined) {
-      process.env[key] = value;
-    }
+    process.env[key] = value;
   }
 }
 
@@ -82,10 +80,9 @@ loadOptionalDotEnv();
  * - local-network: derived from the canonical genesis salt (@aztec/constants).
  *   `aztecNode.getContract` does not expose genesis contracts, so we always
  *   compute the instance locally from the known salt.
- * - testnet (SPONSOR_FPC_ADDRESS set): the address is known but the salt isn't,
- *   so we still need the node to provide the instance data.
- * - testnet (SPONSOR_FPC_SALT set): derived from the declared salt, same as
- *   local-network path.
+ * - testnet: fetch by SPONSOR_FPC_ADDRESS from `.env`, or fall back to the
+ *   canonical genesis FPC (SPONSORED_FPC_CANONICAL_ADDRESS).
+ * - testnet (SPONSOR_FPC_SALT set, no address): derived from the declared salt.
  *
  * Returning the full instance (not just the address) lets the caller register
  * it with the PXE without a separate `getContract` call that may return undefined.
@@ -101,28 +98,31 @@ const getSponsoredFpcInstance = async (
     );
   }
 
-  const envAddress = process.env.SPONSOR_FPC_ADDRESS;
-  if (envAddress) {
-    const instance = await aztecNode.getContract(
-      AztecAddress.fromString(envAddress)
-    );
-    if (!instance) {
-      throw new Error(
-        `SponsoredFPC at SPONSOR_FPC_ADDRESS=${envAddress} not found on node. Verify the address is correct.`
-      );
-    }
+  const envAddress =
+    process.env.SPONSOR_FPC_ADDRESS ?? SPONSORED_FPC_CANONICAL_ADDRESS;
+  const instance = await aztecNode.getContract(
+    AztecAddress.fromString(envAddress)
+  );
+  if (instance) {
     return instance;
   }
 
-  const envSalt = process.env.SPONSOR_FPC_SALT;
-  if (!envSalt) {
+  if (process.env.SPONSOR_FPC_ADDRESS) {
     throw new Error(
-      'Either SPONSOR_FPC_ADDRESS or SPONSOR_FPC_SALT env var must be set when deploying to testnet'
+      `SponsoredFPC at SPONSOR_FPC_ADDRESS=${process.env.SPONSOR_FPC_ADDRESS} not found on node. Verify the address is correct.`
     );
   }
-  return getContractInstanceFromInstantiationParams(
-    SponsoredFPCContractArtifact,
-    { salt: Fr.fromHexString(envSalt) }
+
+  const envSalt = process.env.SPONSOR_FPC_SALT;
+  if (envSalt) {
+    return getContractInstanceFromInstantiationParams(
+      SponsoredFPCContractArtifact,
+      { salt: Fr.fromHexString(envSalt) }
+    );
+  }
+
+  throw new Error(
+    `SponsoredFPC at canonical address ${SPONSORED_FPC_CANONICAL_ADDRESS} not found on node`
   );
 };
 
@@ -258,8 +258,11 @@ async function deployToNetwork(networkId: string): Promise<void> {
     console.log('Deploying SingleLayer...');
     const slWeights = getSingleLayerWeights();
     const slBiases = getSingleLayerBiases();
-    const slPackedWeights = packToFields(slWeights, 23, 28);
-    const slPackedBiases = packToFields(slBiases, 1, 10);
+    const slPackedWeights = packToFields(
+      slWeights,
+      MAX_TRAINER_PACKED_WEIGHT_FIELDS
+    );
+    const slPackedBiases = packToFields(slBiases, MAX_TRAINER_PACKED_BIAS_FIELDS, 10);
     const { contract: singleLayer } = await SingleLayerContract.deployWithOpts(
       { method: 'constructor_pretrained', wallet: deployWallet },
       slPackedWeights,
@@ -279,8 +282,11 @@ async function deployToNetwork(networkId: string): Promise<void> {
     console.log('Deploying MultiLayerPerceptron...');
     const mlpWeights = getMLPWeights();
     const mlpBiases = getMLPBiases();
-    const mlpPackedWeights = packToFields(mlpWeights, 43, 28);
-    const mlpPackedBiases = packToFields(mlpBiases, 1, 26);
+    const mlpPackedWeights = packToFields(
+      mlpWeights,
+      MAX_TRAINER_PACKED_WEIGHT_FIELDS
+    );
+    const mlpPackedBiases = packToFields(mlpBiases, MAX_TRAINER_PACKED_BIAS_FIELDS, 26);
     const { contract: mlp } = await MultiLayerPerceptronContract.deployWithOpts(
       { method: 'constructor_pretrained', wallet: deployWallet },
       mlpPackedWeights,
@@ -305,8 +311,11 @@ async function deployToNetwork(networkId: string): Promise<void> {
     console.log('Deploying CNNGAP...');
     const cnnWeights = getCNNWeights();
     const cnnBiases = getCNNBiases();
-    const cnnPackedWeights = packToFields(cnnWeights, 3, 28);
-    const cnnPackedBiases = packToFields(cnnBiases, 1, 28);
+    const cnnPackedWeights = packToFields(
+      cnnWeights,
+      MAX_TRAINER_PACKED_WEIGHT_FIELDS
+    );
+    const cnnPackedBiases = packToFields(cnnBiases, MAX_TRAINER_PACKED_BIAS_FIELDS, 28);
     const { contract: cnn } = await CNNGAPContract.deployWithOpts(
       { method: 'constructor_pretrained', wallet: deployWallet },
       cnnPackedWeights,
@@ -357,6 +366,12 @@ async function main() {
     'local-network';
 
   const networks = network === 'all' ? ['local-network', 'testnet'] : [network];
+
+  // Drop any leftover LMDB state from a prior crash (native malloc errors on reopen).
+  fs.rmSync(path.join(process.cwd(), '.deploy-store'), {
+    recursive: true,
+    force: true,
+  });
 
   try {
     for (const n of networks) {
