@@ -38,7 +38,11 @@ import {
   getCNNWeights,
   getCNNBiases,
 } from './pretrained-weights.js';
-import { packToFields, MAX_TRAINER_PACKED_BIAS_FIELDS, MAX_TRAINER_PACKED_WEIGHT_FIELDS } from './weight-packing.js';
+import {
+  packToFields,
+  MAX_TRAINER_PACKED_BIAS_FIELDS,
+  MAX_TRAINER_PACKED_WEIGHT_FIELDS,
+} from './weight-packing.js';
 import { SPONSORED_FPC_CANONICAL_ADDRESS } from '../src/config/networks/sponsoredFpc.js';
 
 const NETWORK_URLS: Record<string, string> = {
@@ -262,7 +266,11 @@ async function deployToNetwork(networkId: string): Promise<void> {
       slWeights,
       MAX_TRAINER_PACKED_WEIGHT_FIELDS
     );
-    const slPackedBiases = packToFields(slBiases, MAX_TRAINER_PACKED_BIAS_FIELDS, 10);
+    const slPackedBiases = packToFields(
+      slBiases,
+      MAX_TRAINER_PACKED_BIAS_FIELDS,
+      10
+    );
     const { contract: singleLayer } = await SingleLayerContract.deployWithOpts(
       { method: 'constructor_pretrained', wallet: deployWallet },
       slPackedWeights,
@@ -286,7 +294,11 @@ async function deployToNetwork(networkId: string): Promise<void> {
       mlpWeights,
       MAX_TRAINER_PACKED_WEIGHT_FIELDS
     );
-    const mlpPackedBiases = packToFields(mlpBiases, MAX_TRAINER_PACKED_BIAS_FIELDS, 26);
+    const mlpPackedBiases = packToFields(
+      mlpBiases,
+      MAX_TRAINER_PACKED_BIAS_FIELDS,
+      26
+    );
     const { contract: mlp } = await MultiLayerPerceptronContract.deployWithOpts(
       { method: 'constructor_pretrained', wallet: deployWallet },
       mlpPackedWeights,
@@ -315,7 +327,11 @@ async function deployToNetwork(networkId: string): Promise<void> {
       cnnWeights,
       MAX_TRAINER_PACKED_WEIGHT_FIELDS
     );
-    const cnnPackedBiases = packToFields(cnnBiases, MAX_TRAINER_PACKED_BIAS_FIELDS, 28);
+    const cnnPackedBiases = packToFields(
+      cnnBiases,
+      MAX_TRAINER_PACKED_BIAS_FIELDS,
+      28
+    );
     const { contract: cnn } = await CNNGAPContract.deployWithOpts(
       { method: 'constructor_pretrained', wallet: deployWallet },
       cnnPackedWeights,
