@@ -298,11 +298,10 @@ pub contract NNTrainerTemplate {
         network_weights: [Field; MAX_TRAINER_TOTAL_WEIGHTS],
         network_biases: [Field; MAX_TRAINER_TOTAL_BIASES],
     ) -> pub [Field; MAX_TRAINER_OUTPUT_SIZE] {
-        assert(false, "Host contract must override _compute_forward_pass_impl");
-        [0; MAX_TRAINER_OUTPUT_SIZE]
+        panic("Host contract must override _compute_forward_pass_impl")
     }
 
-    #[internal("public")]
+    #[internal("private")]
     fn _compute_new_weights(
         input_pixels: [Field; MAX_TRAINER_INPUT_SIZE],
         label: Field,
@@ -317,7 +316,7 @@ pub contract NNTrainerTemplate {
         )
     }
 
-    #[internal("public")]
+    #[internal("private")]
     #[template_virtual]
     fn _compute_new_weights_impl(
         input_pixels: [Field; MAX_TRAINER_INPUT_SIZE],
@@ -325,8 +324,7 @@ pub contract NNTrainerTemplate {
         old_network_weights: [Field; MAX_TRAINER_TOTAL_WEIGHTS],
         old_network_biases: [Field; MAX_TRAINER_TOTAL_BIASES],
     ) -> pub ([Field; MAX_TRAINER_TOTAL_WEIGHTS], [Field; MAX_TRAINER_TOTAL_BIASES]) {
-        assert(false, "Host contract must override _compute_new_weights_impl");
-        (old_network_weights, old_network_biases)
+        panic("Host contract must override _compute_new_weights_impl")
     }
 
     #[internal("public")]
@@ -343,7 +341,11 @@ pub contract NNTrainerTemplate {
     }
 
     /// Shared submit entrypoint for training input across all trainer hosts.
-    #[external("public")]
+    ///
+    /// Runs in private: input pixels and label are never revealed on-chain.
+    /// The gradient update is proven correct by the ZK circuit, then committed
+    /// via a hash and written atomically by the enqueued public `apply_training_update`.
+    #[external("private")]
     fn submit_training_input(
         input_pixels: [Field; MAX_TRAINER_INPUT_SIZE],
         label: Field,
@@ -365,7 +367,7 @@ pub contract NNTrainerTemplate {
         let current_weights_hash =
             nn_trainer_compute_secure_hash(current_packed_weights, current_packed_biases);
 
-        self.internal._apply_training_update(
+        self.enqueue_self.apply_training_update(
             current_weights_hash,
             new_packed_weights,
             new_packed_biases,

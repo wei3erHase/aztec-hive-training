@@ -56,7 +56,7 @@ pub contract SingleLayer {
         architecture::compute_forward_pass_trainer(input_pixels, network_weights, network_biases)
     }
 
-    #[internal("public")]
+    #[internal("private")]
     fn _compute_new_weights_impl(
         input_pixels: [Field; NNTrainerTemplate::MAX_TRAINER_INPUT_SIZE],
         label: Field,

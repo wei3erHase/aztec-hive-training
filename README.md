@@ -180,6 +180,10 @@ Training on Aztec uses a **hash-commitment pattern** to prevent race conditions:
 
 This means the gradient computation is proven correct by the ZK circuit, and the public state update is atomic and replay-safe.
 
+### Aztec Templating Guide
+
+- [Templating Playbook](contracts/templating_skill.md): unified guide with templating practices and Aztec-NR migration-specific Do/Don’t.
+
 ### Neural Network Architectures
 
 | Contract | Architecture | Weights | Biases |
