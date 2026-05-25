@@ -7,12 +7,12 @@
     "node": ">=22.0.0"
   },
   "scripts": {
-    "clean": "rm -rf dist src/target src/artifacts/*.json src/artifacts/*.js src/artifacts/*.d.ts contracts/*/target target",
-    "build:contracts": "aztec compile && mkdir -p src/target && cp target/*.json src/target/",
-    "codegen": "aztec codegen src/target --outdir src/artifacts -f",
+    "clean": "rm -rf dist src/artifacts/*.json src/artifacts/*.js src/artifacts/*.d.ts contracts/*/target target",
+    "build:contracts": "aztec compile && yarn codegen",
+    "codegen": "aztec codegen target --outdir src/artifacts -f",
     "build:local": "yarn build-contracts && yarn build-app",
     "build": "yarn build-contracts && yarn build-app",
-    "build-contracts": "tsx scripts/build-contracts.ts --force",
+    "build-contracts": "tsx scripts/build-contracts.ts",
     "build:ci": "yarn build-app:ci",
     "deploy-contracts": "tsx scripts/deploy.ts",
     "deploy-contracts:local-network": "tsx scripts/deploy.ts --network=local-network",
