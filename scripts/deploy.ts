@@ -202,7 +202,7 @@ async function deployToNetwork(networkId: string): Promise<void> {
     }
 
     if (!registered) {
-      // Use the legacy SponsoredFPC artifact (compiled with aztec-nr 4.2.0-aztecnr-rc.2)
+      // Use the legacy SponsoredFPC artifact (compiled with aztec-nr 4.3.0)
       // to register the on-chain FPC class so PXE can prove `sponsor_unconditionally()`.
       try {
         const _require = createRequire(import.meta.url);
@@ -223,9 +223,7 @@ async function deployToNetwork(networkId: string): Promise<void> {
           instance: sponsoredFPCInstance,
           artifact: legacyArtifact,
         });
-        console.log(
-          '  Registered FPC with legacy artifact (4.2.0-aztecnr-rc.2).'
-        );
+        console.log('  Registered FPC with legacy artifact (4.3.0).');
       } catch (legacyErr) {
         console.warn(
           `  [warn] Legacy FPC artifact registration also failed: ${(legacyErr as Error).message}`
