@@ -108,7 +108,11 @@ export default class TrainingBenchmark extends Benchmark {
       getSingleLayerWeights(),
       MAX_TRAINER_PACKED_WEIGHT_FIELDS
     );
-    const singlePackedBiases = packToFields(getSingleLayerBiases(), MAX_TRAINER_PACKED_BIAS_FIELDS, 10);
+    const singlePackedBiases = packToFields(
+      getSingleLayerBiases(),
+      MAX_TRAINER_PACKED_BIAS_FIELDS,
+      10
+    );
     const { contract: singleContract } =
       await SingleLayerContract.deployWithOpts(
         { wallet, method: 'constructor_pretrained' },
@@ -131,7 +135,11 @@ export default class TrainingBenchmark extends Benchmark {
       getMLPWeights(),
       MAX_TRAINER_PACKED_WEIGHT_FIELDS
     );
-    const mlpPackedBiases = packToFields(getMLPBiases(), MAX_TRAINER_PACKED_BIAS_FIELDS, 26);
+    const mlpPackedBiases = packToFields(
+      getMLPBiases(),
+      MAX_TRAINER_PACKED_BIAS_FIELDS,
+      26
+    );
     const { contract: mlpContract } =
       await MultiLayerPerceptronContract.deployWithOpts(
         { wallet, method: 'constructor_pretrained' },
@@ -152,7 +160,11 @@ export default class TrainingBenchmark extends Benchmark {
       getCNNWeights(),
       MAX_TRAINER_PACKED_WEIGHT_FIELDS
     );
-    const cnnPackedBiases = packToFields(getCNNBiases(), MAX_TRAINER_PACKED_BIAS_FIELDS, 28);
+    const cnnPackedBiases = packToFields(
+      getCNNBiases(),
+      MAX_TRAINER_PACKED_BIAS_FIELDS,
+      28
+    );
     const { contract: cnnContract } = await CNNGAPContract.deployWithOpts(
       { wallet, method: 'constructor_pretrained' },
       cnnPackedWeights,
